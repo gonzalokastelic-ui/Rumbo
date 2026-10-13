@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0a0c" />
+    <meta
+      name="description"
+      content="Rumbo te arma el checklist completo de tu viaje según tu destino: documentos, vuelos, alojamiento y actividades. Compartilo con quien viaja con vos."
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preload" as="image" href="/destinos/brasil.jpg" fetchpriority="high" />
+    <title>Rumbo | Organizá tu viaje desde cero</title>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('rumbo-theme');
+          if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

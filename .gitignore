@@ -1,0 +1,14 @@
+# dependencias y build
+node_modules
+dist
+dist-ssr
+
+# variables de entorno (usá .env.example como plantilla)
+.env
+.env.*
+!.env.example
+
+# logs y sistema
+*.log
+.DS_Store
+.vercel

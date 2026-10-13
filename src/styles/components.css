@@ -1,0 +1,463 @@
+/* ---------- Vidrio ---------- */
+.glass {
+  position: relative;
+  background: var(--glass);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  border-radius: var(--r-lg);
+  box-shadow:
+    0 0 0 1px var(--glass-line),
+    inset 0 1px 0 var(--glass-hi),
+    var(--shadow);
+}
+
+.glass--md {
+  border-radius: var(--r-md);
+}
+
+.glass--quiet {
+  box-shadow:
+    0 0 0 1px var(--glass-line),
+    inset 0 1px 0 var(--glass-hi);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass {
+    background: var(--solid);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background: var(--solid);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* ---------- Botones ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 22px;
+  border-radius: var(--r-pill);
+  font-weight: 550;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  transition:
+    transform 0.5s var(--ease),
+    background-color 0.3s var(--ease),
+    box-shadow 0.3s var(--ease),
+    opacity 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background: var(--red);
+  color: var(--red-ink);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 10px 30px -10px color-mix(in oklab, var(--red) 70%, transparent);
+}
+
+.btn--primary:hover {
+  background: var(--red-hi);
+}
+
+.btn--glass {
+  background: var(--glass-2);
+  box-shadow:
+    0 0 0 1px var(--glass-line),
+    inset 0 1px 0 var(--glass-hi);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.btn--glass:hover {
+  background: var(--glass-line);
+}
+
+.btn--ghost {
+  color: var(--text-2);
+  padding: 0 14px;
+}
+
+.btn--ghost:hover {
+  color: var(--text);
+  background: var(--glass);
+}
+
+.btn--danger:hover {
+  color: var(--accent-text);
+}
+
+.btn--sm {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 0.85rem;
+}
+
+.btn--block {
+  width: 100%;
+}
+
+.btn__ico {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-right: -10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  transition: transform 0.5s var(--ease);
+}
+
+.btn:hover .btn__ico {
+  transform: translate(2px, -1px) scale(1.06);
+}
+
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: var(--text-2);
+  transition:
+    background-color 0.25s,
+    color 0.25s,
+    transform 0.4s var(--ease);
+}
+
+.icon-btn:hover {
+  background: var(--glass-2);
+  color: var(--text);
+}
+
+.icon-btn:active {
+  transform: scale(0.92);
+}
+
+/* ---------- Formularios ---------- */
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field > label,
+.field__label {
+  font-size: 0.85rem;
+  font-weight: 550;
+  color: var(--text-2);
+}
+
+.field__hint {
+  font-size: 0.8rem;
+  color: var(--text-3);
+}
+
+.field__error {
+  font-size: 0.82rem;
+  color: var(--accent-text);
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--field);
+  color: var(--text);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background-color 0.2s;
+}
+
+.textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--text-3);
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--red-hi);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--red) 28%, transparent);
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--red-hi);
+}
+
+.select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) 52%,
+    calc(100% - 14px) 52%;
+  background-size:
+    6px 6px,
+    6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 40px;
+}
+
+.select option {
+  color: #17171a;
+}
+
+/* ---------- Piezas chicas ---------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 11px;
+  border-radius: var(--r-pill);
+  background: var(--glass-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 0.78rem;
+  font-weight: 550;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.chip--red {
+  background: color-mix(in oklab, var(--red) 18%, transparent);
+  color: var(--accent-text);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--red) 36%, transparent);
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--glass-2);
+  box-shadow: 0 0 0 2px var(--bg);
+  font-size: 0.75rem;
+  font-weight: 650;
+  overflow: hidden;
+  flex: none;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar--red {
+  background: var(--red);
+  color: #fff;
+}
+
+.avatars {
+  display: flex;
+}
+
+.avatars .avatar + .avatar {
+  margin-left: -8px;
+}
+
+.ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.ring svg {
+  transform: rotate(-90deg);
+}
+
+.ring__track {
+  stroke: var(--line);
+}
+
+.ring__bar {
+  stroke: var(--red);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.9s var(--ease);
+}
+
+.ring__label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
+.bar {
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.bar > span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  background: var(--red);
+  transform-origin: left;
+  transition: transform 0.9s var(--ease);
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in oklab, currentColor 25%, transparent);
+  border-top-color: currentColor;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.skeleton {
+  border-radius: var(--r-md);
+  background: linear-gradient(100deg, var(--glass) 30%, var(--glass-2) 50%, var(--glass) 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ---------- Toasts ---------- */
+.toasts {
+  position: fixed;
+  z-index: var(--z-toast);
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 10px;
+  width: min(92vw, 420px);
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  font-size: 0.92rem;
+  animation: toast-in 0.55s var(--ease);
+}
+
+.toast svg {
+  flex: none;
+}
+
+.toast--error svg {
+  color: var(--accent-text);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+}
+
+/* ---------- Modal ---------- */
+.modal-back {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in oklab, var(--bg) 62%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: fade-in 0.3s;
+}
+
+.modal {
+  width: min(100%, 520px);
+  max-height: 88dvh;
+  overflow: auto;
+  padding: 28px;
+  background: var(--solid);
+  animation: modal-in 0.5s var(--ease);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+}
+
+/* ---------- Aparicion al hacer scroll ---------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 0.9s var(--ease),
+    transform 0.9s var(--ease);
+  transition-delay: calc(var(--i, 0) * 70ms);
+}
+
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+.no-js .reveal {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}

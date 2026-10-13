@@ -1,0 +1,73 @@
+/* Tokens de diseno de Rumbo.
+   Sistema: glassmorphism sobre fotografia, un unico acento rojo, tipografia
+   sans-serif (Geist). Una sola escala de radios:
+   cards 26px, controles 18px, campos 14px, botones en pastilla. */
+:root {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-soft: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --r-sm: 14px;
+  --r-md: 18px;
+  --r-lg: 26px;
+  --r-pill: 999px;
+
+  --red: #dc2f28;
+  --red-hi: #ea463e;
+  --red-ink: #ffffff;
+
+  --nav-h: 64px;
+  --maxw: 1240px;
+  --gutter: clamp(16px, 4vw, 40px);
+
+  /* capas */
+  --z-stage: 0;
+  --z-content: 1;
+  --z-nav: 40;
+  --z-modal: 60;
+  --z-toast: 80;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0a0a0c;
+  --bg-2: #131317;
+  --text: #f6f4f3;
+  --text-2: rgba(246, 244, 243, 0.74);
+  --text-3: rgba(246, 244, 243, 0.52);
+  --glass: rgba(255, 255, 255, 0.09);
+  --glass-2: rgba(255, 255, 255, 0.13);
+  --glass-line: rgba(255, 255, 255, 0.15);
+  --glass-hi: rgba(255, 255, 255, 0.28);
+  --line: rgba(255, 255, 255, 0.11);
+  --field: rgba(255, 255, 255, 0.06);
+  --scrim-a: rgba(8, 8, 10, 0.12);
+  --scrim-b: rgba(8, 8, 10, 0.68);
+  --scrim-side: rgba(8, 8, 10, 0.5);
+  --accent-text: #ff7d75;
+  --shadow: 0 30px 80px -34px rgba(0, 0, 0, 0.75);
+  --solid: #17171c;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #efedec;
+  --bg-2: #e5e2e0;
+  --text: #17171a;
+  --text-2: rgba(23, 23, 26, 0.74);
+  --text-3: rgba(23, 23, 26, 0.56);
+  --glass: rgba(255, 255, 255, 0.6);
+  --glass-2: rgba(255, 255, 255, 0.82);
+  --glass-line: rgba(23, 23, 26, 0.1);
+  --glass-hi: rgba(255, 255, 255, 0.95);
+  --line: rgba(23, 23, 26, 0.1);
+  --field: rgba(255, 255, 255, 0.72);
+  --scrim-a: rgba(244, 242, 241, 0.34);
+  --scrim-b: rgba(244, 242, 241, 0.88);
+  --scrim-side: rgba(244, 242, 241, 0.55);
+  --accent-text: #c3231d;
+  --shadow: 0 30px 70px -34px rgba(70, 24, 20, 0.4);
+  --solid: #ffffff;
+}

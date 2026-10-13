@@ -1,0 +1,104 @@
+rules_version = '2';
+
+// Reglas de Rumbo.
+// Modelo: cada viaje tiene un mapa `miembros` { uid: 'owner' | 'editor' | 'viewer' }
+// y un arreglo `miembrosUids` (necesario para consultar "mis viajes").
+// Se publican desde Firebase Console > Firestore > Reglas.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function tripPath(tripId) {
+      return /databases/$(database)/documents/trips/$(tripId);
+    }
+
+    function roleIn(tripId) {
+      return get(tripPath(tripId)).data.miembros[request.auth.uid];
+    }
+
+    function validTrip(d) {
+      return d.nombre is string && d.nombre.size() > 0 && d.nombre.size() <= 80
+        && d.destinoId is string
+        && d.viajeros is int && d.viajeros >= 1 && d.viajeros <= 20;
+    }
+
+    function validItem(d) {
+      return d.titulo is string && d.titulo.size() > 0 && d.titulo.size() <= 120
+        && d.categoria is string
+        && d.estado in ['pendiente', 'tramite', 'listo']
+        && (!('notas' in d) || d.notas.size() <= 600);
+    }
+
+    // Alguien con un link de invitacion activo se agrega a si mismo, y solo a si mismo.
+    function joining(tripId) {
+      let d = request.resource.data;
+      let o = resource.data;
+      let invite = get(/databases/$(database)/documents/invites/$(d.joinToken)).data;
+      return d.diff(o).affectedKeys().hasOnly(['miembros', 'miembrosUids', 'miembrosInfo', 'joinToken'])
+        && !(request.auth.uid in o.miembrosUids)
+        && request.auth.uid in d.miembrosUids
+        && d.miembrosUids.size() == o.miembrosUids.size() + 1
+        && d.miembros.diff(o.miembros).affectedKeys().hasOnly([request.auth.uid])
+        && invite.tripId == tripId
+        && invite.activo == true
+        && d.miembros[request.auth.uid] == invite.rol;
+    }
+
+    // Un miembro puede salirse del viaje (no el owner).
+    function leaving() {
+      let d = request.resource.data;
+      let o = resource.data;
+      return d.diff(o).affectedKeys().hasOnly(['miembros', 'miembrosUids', 'miembrosInfo'])
+        && o.miembros[request.auth.uid] != 'owner'
+        && !(request.auth.uid in d.miembrosUids);
+    }
+
+    match /trips/{tripId} {
+      allow read: if signedIn() && request.auth.uid in resource.data.miembrosUids;
+
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.miembrosUids == [request.auth.uid]
+        && request.resource.data.miembros[request.auth.uid] == 'owner'
+        && validTrip(request.resource.data);
+
+      allow update: if signedIn() && (
+        (resource.data.ownerId == request.auth.uid
+          && request.resource.data.ownerId == request.auth.uid
+          && validTrip(request.resource.data))
+        || (resource.data.miembros[request.auth.uid] in ['owner', 'editor']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resumen']))
+        || joining(tripId)
+        || leaving()
+      );
+
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+
+      match /items/{itemId} {
+        allow read: if signedIn() && roleIn(tripId) in ['owner', 'editor', 'viewer'];
+        // Al crear un viaje, sus items se escriben en el mismo batch: el viaje todavia
+        // no existe en la base, por eso se consulta el estado posterior (getAfter).
+        allow create: if signedIn()
+          && getAfter(tripPath(tripId)).data.miembros[request.auth.uid] in ['owner', 'editor']
+          && validItem(request.resource.data);
+        allow update: if signedIn() && roleIn(tripId) in ['owner', 'editor']
+          && validItem(request.resource.data);
+        allow delete: if signedIn() && roleIn(tripId) in ['owner', 'editor'];
+      }
+    }
+
+    // El token es largo e impredecible: se permite `get` pero no listar todos.
+    match /invites/{token} {
+      allow get: if signedIn();
+      allow list: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && get(tripPath(request.resource.data.tripId)).data.ownerId == request.auth.uid
+        && request.resource.data.rol in ['editor', 'viewer'];
+      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+  }
+}

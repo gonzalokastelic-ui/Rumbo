@@ -1,0 +1,365 @@
+// Motor de requisitos: dado un destino (y una plantilla), devuelve el checklist
+// minimo para viajar desde Argentina. `diasAntes` es cuantos dias antes de la
+// salida conviene tenerlo resuelto: con eso se calculan las fechas limite.
+//
+// Los requisitos migratorios cambian. Cada destino lleva `verificado` y la app
+// siempre muestra un aviso para confirmar en la fuente oficial.
+
+export const CATEGORIAS = [
+  { id: 'documentacion', nombre: 'Documentación', icono: 'IdentificationCard' },
+  { id: 'salud', nombre: 'Salud y seguro', icono: 'FirstAidKit' },
+  { id: 'transporte', nombre: 'Transporte', icono: 'AirplaneTilt' },
+  { id: 'alojamiento', nombre: 'Alojamiento', icono: 'Bed' },
+  { id: 'actividades', nombre: 'Actividades', icono: 'MapPinArea' },
+  { id: 'dinero', nombre: 'Dinero y básicos', icono: 'Wallet' },
+];
+
+export const CATEGORIAS_POR_ID = Object.fromEntries(CATEGORIAS.map((c) => [c.id, c]));
+
+export const ESTADOS = [
+  { id: 'pendiente', nombre: 'Pendiente' },
+  { id: 'tramite', nombre: 'En trámite' },
+  { id: 'listo', nombre: 'Listo' },
+];
+
+export const PLANTILLAS = [
+  { id: 'vacaciones', nombre: 'Vacaciones', desc: 'El checklist estándar para descansar.' },
+  { id: 'escapada', nombre: 'Escapada corta', desc: 'Fin de semana largo, equipaje de mano.' },
+  { id: 'familia', nombre: 'En familia', desc: 'Suma trámites y reservas para menores.' },
+  { id: 'mochilero', nombre: 'Mochilero', desc: 'Presupuesto ajustado y reservas flexibles.' },
+  { id: 'trabajo', nombre: 'Trabajo o estudio', desc: 'Documentos y conectividad para rendir.' },
+];
+
+const base = [
+  {
+    key: 'seguro',
+    titulo: 'Seguro de viaje con asistencia médica',
+    categoria: 'salud',
+    diasAntes: 30,
+    desc: 'Cobertura médica, cancelación y equipaje. Revisá el tope de gastos médicos.',
+  },
+  {
+    key: 'vuelos',
+    titulo: 'Vuelos de ida y vuelta',
+    categoria: 'transporte',
+    diasAntes: 60,
+    desc: 'Mirá el calendario de precios en Recomendados antes de elegir fecha.',
+  },
+  {
+    key: 'alojamiento',
+    titulo: 'Alojamiento reservado',
+    categoria: 'alojamiento',
+    diasAntes: 45,
+    desc: 'Preferí tarifas con cancelación gratuita hasta tener todo confirmado.',
+  },
+  {
+    key: 'traslado',
+    titulo: 'Traslado del aeropuerto al alojamiento',
+    categoria: 'transporte',
+    diasAntes: 7,
+    desc: 'Transfer privado, transporte público o remís. Guardá la dirección sin conexión.',
+  },
+  {
+    key: 'actividades',
+    titulo: 'Actividades y entradas principales',
+    categoria: 'actividades',
+    diasAntes: 21,
+    desc: 'Reservá con anticipación las que tienen cupo limitado.',
+  },
+  {
+    key: 'tarjetas',
+    titulo: 'Tarjetas habilitadas para el exterior',
+    categoria: 'dinero',
+    diasAntes: 10,
+    desc: 'Confirmá el límite internacional y llevá una segunda tarjeta de respaldo.',
+  },
+  {
+    key: 'conectividad',
+    titulo: 'eSIM, chip local o roaming',
+    categoria: 'dinero',
+    diasAntes: 5,
+    desc: 'Verificá que tu celular esté liberado antes de comprar una eSIM.',
+  },
+  {
+    key: 'copias',
+    titulo: 'Copias digitales de documentos y reservas',
+    categoria: 'documentacion',
+    diasAntes: 3,
+    desc: 'Pasaporte, seguro, vouchers y contactos de emergencia, disponibles sin internet.',
+  },
+  {
+    key: 'equipaje',
+    titulo: 'Equipaje y pronóstico del clima',
+    categoria: 'dinero',
+    diasAntes: 2,
+    desc: 'Revisá los límites de peso de tu aerolínea y qué podés llevar en cabina.',
+  },
+];
+
+const porDestino = {
+  brasil: {
+    verificado: '2026-10-13',
+    items: [
+      {
+        key: 'documento',
+        titulo: 'DNI en buen estado o pasaporte vigente',
+        categoria: 'documentacion',
+        diasAntes: 30,
+        desc: 'Los argentinos entran a Brasil con DNI sin visa para turismo. El documento debe estar en buen estado.',
+        link: 'https://www.cancilleria.gob.ar',
+      },
+      {
+        key: 'vacunas',
+        titulo: 'Calendario de vacunación al día',
+        categoria: 'salud',
+        diasAntes: 30,
+        desc: 'Consultá con tu médico si conviene la vacuna contra la fiebre amarilla según las zonas que visites.',
+      },
+    ],
+  },
+  chile: {
+    verificado: '2026-10-13',
+    items: [
+      {
+        key: 'documento',
+        titulo: 'DNI en buen estado o pasaporte vigente',
+        categoria: 'documentacion',
+        diasAntes: 30,
+        desc: 'Los argentinos ingresan a Chile con DNI sin visa para turismo.',
+        link: 'https://www.cancilleria.gob.ar',
+      },
+      {
+        key: 'sag',
+        titulo: 'Declaración jurada del SAG',
+        categoria: 'documentacion',
+        diasAntes: 1,
+        desc: 'Declarás si traés alimentos, plantas o productos de origen animal. No declarar tiene multa.',
+        link: 'https://www.sag.gob.cl',
+      },
+    ],
+  },
+  espana: {
+    verificado: '2026-10-13',
+    items: [
+      {
+        key: 'documento',
+        titulo: 'Pasaporte vigente (al menos 3 meses tras la salida)',
+        categoria: 'documentacion',
+        diasAntes: 90,
+        desc: 'Los argentinos no necesitan visa para estadías turísticas de hasta 90 días en el espacio Schengen.',
+        link: 'https://www.exteriores.gob.es',
+      },
+      {
+        key: 'etias',
+        titulo: 'Verificar si ETIAS ya es obligatorio',
+        categoria: 'documentacion',
+        diasAntes: 30,
+        desc: 'ETIAS es una autorización electrónica de viaje para Europa. Confirmá si ya rige en tu fecha de viaje.',
+        link: 'https://travel-europe.europa.eu/etias_en',
+      },
+      {
+        key: 'solvencia',
+        titulo: 'Pasaje de regreso y comprobante de alojamiento',
+        categoria: 'documentacion',
+        diasAntes: 7,
+        desc: 'Migraciones puede pedir que demuestres vuelta, reserva y medios económicos.',
+      },
+    ],
+  },
+  eeuu: {
+    verificado: '2026-10-13',
+    items: [
+      {
+        key: 'documento',
+        titulo: 'Pasaporte vigente',
+        categoria: 'documentacion',
+        diasAntes: 120,
+        desc: 'Tiene que cubrir toda la estadía. Si vence en menos de un año, renovalo antes de pedir la visa.',
+        link: 'https://www.argentina.gob.ar',
+      },
+      {
+        key: 'visa',
+        titulo: 'Visa de turismo B1/B2',
+        categoria: 'documentacion',
+        diasAntes: 150,
+        desc: 'Los argentinos necesitan visa, ESTA no aplica. Completás el formulario DS-160, pagás la tasa y sacás turno de entrevista en el consulado.',
+        link: 'https://travel.state.gov/content/travel/en/us-visas/tourism-visit/visitor.html',
+      },
+      {
+        key: 'ds160',
+        titulo: 'Entrevista consular y documentación de respaldo',
+        categoria: 'documentacion',
+        diasAntes: 120,
+        desc: 'Llevá comprobantes de trabajo o estudio, ingresos y vínculos con Argentina.',
+      },
+    ],
+  },
+  italia: {
+    verificado: '2026-10-13',
+    items: [
+      {
+        key: 'documento',
+        titulo: 'Pasaporte vigente (al menos 3 meses tras la salida)',
+        categoria: 'documentacion',
+        diasAntes: 90,
+        desc: 'Los argentinos no necesitan visa para estadías turísticas de hasta 90 días en el espacio Schengen.',
+        link: 'https://www.esteri.it',
+      },
+      {
+        key: 'etias',
+        titulo: 'Verificar si ETIAS ya es obligatorio',
+        categoria: 'documentacion',
+        diasAntes: 30,
+        desc: 'ETIAS es una autorización electrónica de viaje para Europa. Confirmá si ya rige en tu fecha de viaje.',
+        link: 'https://travel-europe.europa.eu/etias_en',
+      },
+      {
+        key: 'solvencia',
+        titulo: 'Pasaje de regreso y comprobante de alojamiento',
+        categoria: 'documentacion',
+        diasAntes: 7,
+        desc: 'Migraciones puede pedir que demuestres vuelta, reserva y medios económicos.',
+      },
+    ],
+  },
+  uruguay: {
+    verificado: '2026-10-13',
+    items: [
+      {
+        key: 'documento',
+        titulo: 'DNI en buen estado o pasaporte vigente',
+        categoria: 'documentacion',
+        diasAntes: 15,
+        desc: 'Los argentinos viajan a Uruguay con DNI, sin visa.',
+        link: 'https://www.cancilleria.gob.ar',
+      },
+      {
+        key: 'cruce',
+        titulo: 'Pasaje de barco o vuelo a Montevideo o Colonia',
+        categoria: 'transporte',
+        diasAntes: 30,
+        desc: 'Comparás barco con vuelo según tu punto de partida. En fines de semana largos se agota rápido.',
+      },
+    ],
+  },
+  mexico: {
+    verificado: '2026-10-13',
+    items: [
+      {
+        key: 'documento',
+        titulo: 'Pasaporte vigente',
+        categoria: 'documentacion',
+        diasAntes: 60,
+        desc: 'Los argentinos no necesitan visa para turismo en México. El pasaporte debe estar vigente durante toda la estadía.',
+        link: 'https://www.inm.gob.mx',
+      },
+      {
+        key: 'fmm',
+        titulo: 'Formulario migratorio y comprobantes de viaje',
+        categoria: 'documentacion',
+        diasAntes: 3,
+        desc: 'Completás el formulario migratorio y tené a mano pasaje de regreso y reserva de alojamiento.',
+        link: 'https://www.inm.gob.mx',
+      },
+    ],
+  },
+  aruba: {
+    verificado: '2026-10-13',
+    items: [
+      {
+        key: 'documento',
+        titulo: 'Pasaporte vigente',
+        categoria: 'documentacion',
+        diasAntes: 60,
+        desc: 'Revisá en el sitio oficial de turismo de Aruba los requisitos de ingreso para tu nacionalidad.',
+        link: 'https://www.aruba.com',
+      },
+      {
+        key: 'ingreso',
+        titulo: 'Tarjeta de ingreso y formularios en línea',
+        categoria: 'documentacion',
+        diasAntes: 7,
+        desc: 'Aruba pide completar un formulario digital de embarque y desembarque antes de llegar.',
+        link: 'https://www.aruba.com',
+      },
+    ],
+  },
+};
+
+const porPlantilla = {
+  vacaciones: [],
+  escapada: [
+    {
+      key: 'equipaje-mano',
+      titulo: 'Equipaje solo de cabina',
+      categoria: 'dinero',
+      diasAntes: 2,
+      desc: 'Revisá medidas y peso de cabina de tu aerolínea para no pagar de más.',
+    },
+  ],
+  familia: [
+    {
+      key: 'menores',
+      titulo: 'Autorización de viaje para menores',
+      categoria: 'documentacion',
+      diasAntes: 30,
+      desc: 'Si un menor viaja sin alguno de sus padres, necesita autorización certificada.',
+    },
+    {
+      key: 'asientos',
+      titulo: 'Asientos juntos y cuna o butaca',
+      categoria: 'transporte',
+      diasAntes: 30,
+      desc: 'Elegí los asientos al comprar y consultá por servicios para bebés.',
+    },
+    {
+      key: 'botiquin',
+      titulo: 'Botiquín y medicación habitual',
+      categoria: 'salud',
+      diasAntes: 7,
+      desc: 'Llevá las recetas y medicación en el equipaje de mano.',
+    },
+  ],
+  mochilero: [
+    {
+      key: 'seguro-extendido',
+      titulo: 'Seguro con cobertura para actividades de aventura',
+      categoria: 'salud',
+      diasAntes: 30,
+      desc: 'Verificá que cubra trekking, deportes y estadías largas.',
+    },
+    {
+      key: 'reservas-flexibles',
+      titulo: 'Reservas flexibles o cancelables',
+      categoria: 'alojamiento',
+      diasAntes: 30,
+      desc: 'Dejá margen para cambiar el itinerario sin perder plata.',
+    },
+  ],
+  trabajo: [
+    {
+      key: 'comprobantes',
+      titulo: 'Carta de invitación o comprobante del evento',
+      categoria: 'documentacion',
+      diasAntes: 30,
+      desc: 'Migraciones puede pedir el motivo del viaje. Tené el comprobante a mano.',
+    },
+    {
+      key: 'espacio',
+      titulo: 'Alojamiento con buena conexión y escritorio',
+      categoria: 'alojamiento',
+      diasAntes: 30,
+      desc: 'Confirmá wifi estable y un lugar cómodo para trabajar o estudiar.',
+    },
+  ],
+};
+
+export function requisitosPara(destinoId, plantillaId = 'vacaciones') {
+  const d = porDestino[destinoId];
+  const extras = porPlantilla[plantillaId] || [];
+  return [...(d ? d.items : []), ...base, ...extras].map((it) => ({ ...it }));
+}
+
+export function verificadoPara(destinoId) {
+  return porDestino[destinoId]?.verificado || null;
+}
