@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { LinkSimple, Trash, X } from '@phosphor-icons/react';
 import { CATEGORIAS_POR_ID, ESTADOS } from '../../data/requisitos.js';
 
@@ -6,6 +6,28 @@ import { CATEGORIAS_POR_ID, ESTADOS } from '../../data/requisitos.js';
 // Cada campo guarda al salir del input, asi la persona no tiene que "confirmar".
 export default function ItemDrawer({ item, editable, miembros, onPatch, onDelete, onClose }) {
   const cerrar = useRef(null);
+  const tituloRef = useRef(null);
+  const [eligiendoFecha, setEligiendoFecha] = useState(false);
+
+  // El titulo es un textarea que crece con su contenido (field-sizing no esta en todos los navegadores)
+  const ajustar = (el) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  useLayoutEffect(() => {
+    const el = tituloRef.current;
+    ajustar(el);
+    // Vuelve a medir cuando termina la animacion de entrada, las fuentes y si cambia el ancho
+    const raf = requestAnimationFrame(() => ajustar(el));
+    document.fonts?.ready.then(() => ajustar(el));
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => ajustar(el)) : null;
+    ro?.observe(el);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro?.disconnect();
+    };
+  }, [item.titulo]);
 
   useEffect(() => {
     cerrar.current?.focus();
@@ -32,8 +54,10 @@ export default function ItemDrawer({ item, editable, miembros, onPatch, onDelete
 
         <textarea
           key={`t-${item.id}-${item.titulo}`}
+          ref={tituloRef}
           className="drawer__title"
           rows={1}
+          onInput={(e) => ajustar(e.target)}
           defaultValue={item.titulo}
           maxLength={120}
           disabled={!editable}
@@ -72,23 +96,44 @@ export default function ItemDrawer({ item, editable, miembros, onPatch, onDelete
           </div>
 
           <div className="field">
-            <label htmlFor="d-lim">Fecha límite (opcional)</label>
-            <div className="field__row">
-              <input
-                key={`l-${item.fechaLimite || 'none'}`}
-                id="d-lim"
-                type="date"
-                className="input"
-                defaultValue={item.fechaLimite || ''}
-                disabled={!editable}
-                onBlur={blur('fechaLimite', item.fechaLimite || null, (v) => v || null)}
-              />
-              {editable && item.fechaLimite && (
-                <button type="button" className="btn btn--ghost btn--sm" onClick={() => onPatch(item, { fechaLimite: null })}>
-                  Quitar
-                </button>
-              )}
-            </div>
+            <label htmlFor="d-lim">Fecha límite</label>
+            {item.fechaLimite || eligiendoFecha ? (
+              <div className="field__row">
+                <input
+                  key={`l-${item.fechaLimite || 'none'}`}
+                  id="d-lim"
+                  type="date"
+                  className="input"
+                  autoFocus={eligiendoFecha && !item.fechaLimite}
+                  defaultValue={item.fechaLimite || ''}
+                  disabled={!editable}
+                  onChange={(e) => {
+                    if (e.target.value && e.target.value !== item.fechaLimite) onPatch(item, { fechaLimite: e.target.value });
+                  }}
+                />
+                {editable && (
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => {
+                      setEligiendoFecha(false);
+                      if (item.fechaLimite) onPatch(item, { fechaLimite: null });
+                    }}
+                  >
+                    Quitar
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="field__row">
+                <span className="muted drawer__none">Sin fecha</span>
+                {editable && (
+                  <button type="button" id="d-lim" className="btn btn--glass btn--sm" onClick={() => setEligiendoFecha(true)}>
+                    Elegir fecha
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="field">

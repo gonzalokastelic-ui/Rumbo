@@ -586,6 +586,8 @@
 }
 
 .tv-head {
+  position: relative;
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -841,36 +843,6 @@
   gap: 22px;
 }
 
-.next {
-  display: grid;
-  gap: 8px;
-  padding: 22px 24px;
-}
-
-.next__label {
-  font-size: 0.78rem;
-  font-weight: 650;
-  letter-spacing: 0.02em;
-  color: var(--accent-text);
-}
-
-.next__title {
-  font-size: clamp(1.15rem, 2.4vw, 1.4rem);
-  letter-spacing: -0.025em;
-}
-
-.next__desc {
-  max-width: 62ch;
-  font-size: 0.93rem;
-}
-
-.next__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
 .cl-bar {
   display: flex;
   justify-content: space-between;
@@ -1039,10 +1011,18 @@
 .row__main {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  text-align: left;
+}
+
+.row__text {
+  flex: 1;
+  min-width: 0;
   display: grid;
   gap: 2px;
-  padding: 2px 0;
-  text-align: left;
 }
 
 .row__title {
@@ -1074,16 +1054,17 @@
 .row__go {
   flex: none;
   color: var(--text-3);
-  opacity: 0;
-  transform: translateX(-4px);
+  opacity: 0.7;
   transition:
     opacity 0.2s,
-    transform 0.3s var(--ease);
+    transform 0.3s var(--ease),
+    color 0.2s;
 }
 
-.row:hover .row__go {
+.row__main:hover .row__go {
   opacity: 1;
-  transform: none;
+  color: var(--text);
+  transform: translateX(2px);
 }
 
 .foot-note {
@@ -1121,6 +1102,10 @@
   animation: drawer-in 0.5s var(--ease);
 }
 
+.drawer > * {
+  flex-shrink: 0;
+}
+
 @keyframes drawer-in {
   from {
     opacity: 0;
@@ -1141,9 +1126,10 @@
 }
 
 .drawer__title {
+  display: block;
   width: 100%;
-  padding: 6px 8px;
-  margin: -6px -8px;
+  min-height: 2.6rem;
+  padding: 8px 10px;
   border: 1px solid transparent;
   border-radius: 12px;
   background: transparent;
@@ -1153,7 +1139,7 @@
   line-height: 1.25;
   color: var(--text);
   resize: none;
-  field-sizing: content;
+  overflow: hidden;
   overflow-wrap: anywhere;
 }
 
@@ -1180,6 +1166,11 @@
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.drawer__none {
+  flex: 1;
+  font-size: 0.92rem;
 }
 
 .drawer__foot {

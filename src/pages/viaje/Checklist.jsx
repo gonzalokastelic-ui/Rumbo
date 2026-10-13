@@ -33,7 +33,7 @@ import {
 } from '@phosphor-icons/react';
 import { CATEGORIAS, CATEGORIAS_POR_ID } from '../../data/requisitos.js';
 import { formatoCorto, urgencia } from '../../lib/fechas.js';
-import { mensajeError, ordenarItems, proximoPaso, estaVencido } from '../../lib/viajes.js';
+import { mensajeError, ordenarItems, estaVencido } from '../../lib/viajes.js';
 import { useToast } from '../../components/ui.jsx';
 import ItemDrawer from './ItemDrawer.jsx';
 
@@ -93,24 +93,25 @@ function Fila({ item, trip, editable, onPatch, onAbrir }) {
         {item.estado === 'tramite' && <Clock size={13} weight="bold" />}
       </button>
 
-      <button type="button" className="row__main" onClick={() => onAbrir(item.id)}>
-        <span className="row__title">{item.titulo}</span>
-        {(item.fechaLimite || item.estado === 'tramite' || asignado || item.costo > 0) && (
-          <span className="row__sub">
-            {item.fechaLimite && item.estado !== 'listo' && (
-              <span className={vencido || urgente ? 'is-alert' : ''}>
-                {vencido ? 'Venció el ' : 'Hasta el '}
-                {formatoCorto(item.fechaLimite)}
-              </span>
-            )}
-            {item.estado === 'tramite' && <span className="is-accent">En trámite</span>}
-            {asignado && <span>{asignado.nombre.split(' ')[0]}</span>}
-            {item.costo > 0 && <span className="mono">USD {item.costo}</span>}
-          </span>
-        )}
+      <button type="button" className="row__main" onClick={() => onAbrir(item.id)} aria-label={`Abrir detalle de ${item.titulo}`}>
+        <span className="row__text">
+          <span className="row__title">{item.titulo}</span>
+          {(item.fechaLimite || item.estado === 'tramite' || asignado || item.costo > 0) && (
+            <span className="row__sub">
+              {item.fechaLimite && item.estado !== 'listo' && (
+                <span className={vencido || urgente ? 'is-alert' : ''}>
+                  {vencido ? 'Venció el ' : 'Hasta el '}
+                  {formatoCorto(item.fechaLimite)}
+                </span>
+              )}
+              {item.estado === 'tramite' && <span className="is-accent">En trámite</span>}
+              {asignado && <span>{asignado.nombre.split(' ')[0]}</span>}
+              {item.costo > 0 && <span className="mono">USD {item.costo}</span>}
+            </span>
+          )}
+        </span>
+        <CaretRight size={18} className="row__go" aria-hidden="true" />
       </button>
-
-      <CaretRight size={16} className="row__go" aria-hidden="true" />
     </li>
   );
 }
@@ -176,7 +177,6 @@ export default function Checklist({ trip, items, editable, store, nota }) {
   const [agregando, setAgregando] = useState(false);
 
   const miembros = useMemo(() => Object.entries(trip.miembrosInfo || {}), [trip.miembrosInfo]);
-  const siguiente = useMemo(() => proximoPaso(items), [items]);
   const abierto = abiertoId ? items.find((i) => i.id === abiertoId) : null;
 
   const secciones = useMemo(() => {
@@ -253,32 +253,6 @@ export default function Checklist({ trip, items, editable, store, nota }) {
 
   return (
     <div className="cl">
-      {siguiente ? (
-        <section className="next glass glass--md" aria-label="Siguiente paso">
-          <p className="next__label">Siguiente paso</p>
-          <h2 className="next__title">{siguiente.titulo}</h2>
-          {siguiente.desc && <p className="next__desc muted">{siguiente.desc}</p>}
-          <div className="next__actions">
-            {editable && (
-              <button type="button" className="btn btn--primary btn--sm" onClick={() => patch(siguiente, { estado: 'listo' })}>
-                <Check size={16} weight="bold" /> Marcar como listo
-              </button>
-            )}
-            <button type="button" className="btn btn--ghost btn--sm" onClick={() => setAbiertoId(siguiente.id)}>
-              Ver detalle
-            </button>
-          </div>
-        </section>
-      ) : (
-        items.length > 0 && (
-          <section className="next next--done glass glass--md" aria-label="Todo listo">
-            <p className="next__label">Todo listo</p>
-            <h2 className="next__title">Resolviste todo lo de la lista.</h2>
-            <p className="next__desc muted">Buen viaje. Si te falta algo, sumalo con Agregar.</p>
-          </section>
-        )
-      )}
-
       <div className="cl-bar">
         <label className="cl-filter">
           <span className="sr-only">Mostrar</span>
