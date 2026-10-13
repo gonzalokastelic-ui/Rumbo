@@ -23,8 +23,16 @@ const ERRORES = {
   'auth/network-request-failed': 'No hay conexión. Revisá tu internet e intentá de nuevo.',
   'auth/too-many-requests': 'Demasiados intentos. Esperá un momento y probá de nuevo.',
   'auth/operation-not-allowed': 'Este método de acceso no está habilitado en Firebase.',
+  'auth/popup-blocked': 'El navegador bloqueó la ventana de Google. Permití las ventanas emergentes para este sitio.',
 };
-export const mensajeAuth = (e) => ERRORES[e?.code] || 'No pudimos completar el acceso. Intentá de nuevo.';
+
+export const mensajeAuth = (e) => {
+  if (e?.code === 'auth/unauthorized-domain') {
+    return `Este dominio (${window.location.hostname}) no está autorizado en Firebase. Agregalo en Authentication, Configuración, Dominios autorizados.`;
+  }
+  if (e?.code && !ERRORES[e.code]) console.error('Error de acceso', e.code, e);
+  return ERRORES[e?.code] || `No pudimos completar el acceso (${e?.code || 'error desconocido'}). Intentá de nuevo.`;
+};
 
 export function AuthProvider({ children }) {
   const [estado, setEstado] = useState({ listo: false, user: null, store: null });
