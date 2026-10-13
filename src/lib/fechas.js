@@ -42,11 +42,6 @@ export function formatoLargo(iso) {
   return `${d.getDate()} ${MESES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-export function fechaLimite(fechaIda, diasAntes) {
-  if (!fechaIda || diasAntes == null) return null;
-  return sumarDias(fechaIda, -diasAntes);
-}
-
 // 'vencido' | 'urgente' (menos de 14 dias) | 'ok' | null
 export function urgencia(limiteIso) {
   if (!limiteIso) return null;

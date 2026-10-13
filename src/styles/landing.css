@@ -498,6 +498,11 @@
   color: var(--accent-text);
 }
 
+.when__date.is-none {
+  color: var(--text-3);
+  font-weight: 500;
+}
+
 .when__card h3 {
   font-size: 1.02rem;
 }

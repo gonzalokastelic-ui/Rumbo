@@ -82,6 +82,12 @@ export function createMemoryStore() {
       emit();
     },
 
+    async reorderItems(tripId, cambios) {
+      const m = tripItems(tripId);
+      cambios.forEach(({ id, orden }) => m.set(id, { ...m.get(id), orden }));
+      emit();
+    },
+
     async deleteItem(tripId, itemId) {
       tripItems(tripId).delete(itemId);
       emit();

@@ -19,7 +19,7 @@ import { ProgressRing, Reveal } from '../components/ui.jsx';
 import { DESTINOS, foto } from '../data/destinos.js';
 import { CATEGORIAS_POR_ID, requisitosPara } from '../data/requisitos.js';
 import { calendario, datosDestino, resumenPrecios } from '../lib/recomendados.js';
-import { fechaLimite, formatoCorto, sumarDias } from '../lib/fechas.js';
+import { formatoCorto, sumarDias } from '../lib/fechas.js';
 import credits from '../data/credits.json';
 import '../styles/landing.css';
 
@@ -87,7 +87,7 @@ function Hero() {
             <li key={it.key} className={i < 2 ? 'is-done' : ''}>
               <span className="mini-check">{i < 2 && <Check size={13} weight="bold" />}</span>
               <span>{it.titulo}</span>
-              <span className="mono mini-days">{it.diasAntes} d</span>
+              <span className="mini-days">{CATEGORIAS_POR_ID[it.categoria].nombre}</span>
             </li>
           ))}
         </ul>
@@ -324,16 +324,26 @@ function Destinos({ stageRefs }) {
   );
 }
 
-/* ================= 4. Fechas limite (linea que se dibuja) ================= */
+/* ================= 4. Fechas limite elegidas por la persona (linea que se dibuja) ================= */
+// Ejemplo ilustrativo: en la app cada item nace sin fecha y la persona decide si le pone una.
+const FECHAS_EJEMPLO = [
+  ['documento', '2026-11-15'],
+  ['visa', '2026-12-01'],
+  ['ds160', '2026-12-10'],
+  ['vuelos', '2026-12-20'],
+  ['alojamiento', '2027-01-05'],
+  ['seguro', '2027-01-15'],
+];
+
 function FechasLimite() {
   const root = useRef(null);
-  const lista = useMemo(
-    () =>
-      [...EEUU]
-        .map((it) => ({ ...it, limite: fechaLimite(IDA_EJEMPLO, it.diasAntes) }))
-        .sort((a, b) => (a.limite < b.limite ? -1 : 1)),
-    [],
-  );
+  const lista = useMemo(() => {
+    const porKey = Object.fromEntries(requisitosPara('eeuu').map((r) => [r.key, r]));
+    return [
+      ...FECHAS_EJEMPLO.map(([key, limite]) => ({ ...porKey[key], limite })),
+      { ...porKey.equipaje, limite: null },
+    ];
+  }, []);
 
   useLayoutEffect(() => {
     const mm = gsap.matchMedia();
@@ -361,10 +371,10 @@ function FechasLimite() {
     <section id="fechas" ref={root} className="when container" aria-labelledby="when-titulo">
       <div className="when__copy">
         <Reveal as="h2" id="when-titulo">
-          Rumbo cuenta para atrás desde tu viaje.
+          Ponele fecha solo a lo que importa.
         </Reveal>
         <Reveal as="p" className="muted when__lead" i={1}>
-          Ponés la fecha de salida y cada trámite tiene su fecha límite. Si algo tarda meses, lo ves a tiempo.
+          Cada ítem nace sin fecha. Si algo vence, la elegís vos y Rumbo te marca cuándo se acerca.
         </Reveal>
         <Reveal as="div" className="when__goal glass glass--md" i={2}>
           <AirplaneTilt size={22} weight="fill" />
@@ -384,12 +394,12 @@ function FechasLimite() {
             <Reveal as="li" key={it.key} className="when__item" i={i % 3}>
               <span className="when__dot" aria-hidden="true" />
               <div className="when__card glass glass--md">
-                <p className="mono when__date">{formatoCorto(it.limite)}</p>
+                <p className={`mono when__date ${it.limite ? '' : 'is-none'}`}>
+                  {it.limite ? formatoCorto(it.limite) : 'Sin fecha'}
+                </p>
                 <div>
                   <h3>{it.titulo}</h3>
-                  <p className="muted when__days">
-                    <span className="mono">{it.diasAntes}</span> días antes de la salida
-                  </p>
+                  <p className="muted when__days">{CATEGORIAS_POR_ID[it.categoria].nombre}</p>
                 </div>
               </div>
             </Reveal>

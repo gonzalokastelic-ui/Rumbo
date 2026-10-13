@@ -1,220 +1,198 @@
 import { useMemo, useState } from 'react';
 import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
   AirplaneTilt,
   Bed,
   CaretDown,
+  CaretRight,
   Check,
   Circle,
   Clock,
+  DotsSixVertical,
   FirstAidKit,
   IdentificationCard,
-  LinkSimple,
   MapPinArea,
   Plus,
-  Trash,
   Wallet,
-  WarningCircle,
 } from '@phosphor-icons/react';
-import { CATEGORIAS, CATEGORIAS_POR_ID, ESTADOS } from '../../data/requisitos.js';
+import { CATEGORIAS, CATEGORIAS_POR_ID } from '../../data/requisitos.js';
 import { formatoCorto, urgencia } from '../../lib/fechas.js';
-import { mensajeError } from '../../lib/viajes.js';
-import { Avatar, useToast } from '../../components/ui.jsx';
+import { mensajeError, ordenarItems, proximoPaso, estaVencido } from '../../lib/viajes.js';
+import { useToast } from '../../components/ui.jsx';
+import ItemDrawer from './ItemDrawer.jsx';
 
-const FILTROS = [{ id: 'todos', nombre: 'Todos' }, ...ESTADOS.map((e) => ({ id: e.id, nombre: e.nombre === 'Listo' ? 'Listos' : e.nombre === 'Pendiente' ? 'Pendientes' : e.nombre }))];
+const FILTROS = [
+  { id: 'todos', nombre: 'Todos' },
+  { id: 'pendiente', nombre: 'Pendientes' },
+  { id: 'tramite', nombre: 'En trámite' },
+  { id: 'listo', nombre: 'Listos' },
+];
 
 const ICONOS = { IdentificationCard, FirstAidKit, AirplaneTilt, Bed, MapPinArea, Wallet };
 
-function IconoCategoria({ id, size = 20 }) {
+function IconoCategoria({ id }) {
   const Cmp = ICONOS[CATEGORIAS_POR_ID[id]?.icono] || Circle;
-  return <Cmp size={size} weight="duotone" />;
+  return <Cmp size={18} weight="duotone" />;
 }
 
-function FilaItem({ item, trip, editable, onPatch, onDelete, miembros, abierto, onToggle }) {
-  const lim = item.estado === 'listo' ? null : urgencia(item.fechaLimite);
+function Fila({ item, trip, editable, onPatch, onAbrir }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+    disabled: !editable,
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  const vencido = estaVencido(item);
+  const urgente = !vencido && item.estado !== 'listo' && urgencia(item.fechaLimite) === 'urgente';
   const asignado = item.asignadoA ? trip.miembrosInfo?.[item.asignadoA] : null;
 
-  const alternar = () => {
-    if (!editable) return;
-    onPatch(item, { estado: item.estado === 'listo' ? 'pendiente' : 'listo' });
-  };
-
   return (
-    <li className={`item ${item.estado === 'listo' ? 'is-done' : ''} ${abierto ? 'is-open' : ''}`}>
-      <div className="item__row">
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`row ${item.estado === 'listo' ? 'is-done' : ''} ${isDragging ? 'is-drag' : ''}`}
+    >
+      {editable && (
         <button
+          ref={setActivatorNodeRef}
           type="button"
-          className={`check check--${item.estado}`}
-          onClick={alternar}
-          disabled={!editable}
-          aria-label={item.estado === 'listo' ? `Marcar "${item.titulo}" como pendiente` : `Marcar "${item.titulo}" como listo`}
-          aria-pressed={item.estado === 'listo'}
+          className="row__handle"
+          aria-label={`Reordenar "${item.titulo}"`}
+          {...attributes}
+          {...listeners}
         >
-          {item.estado === 'listo' && <Check size={14} weight="bold" />}
-          {item.estado === 'tramite' && <Clock size={13} weight="bold" />}
+          <DotsSixVertical size={18} weight="bold" />
         </button>
+      )}
 
-        <button type="button" className="item__main" onClick={onToggle} aria-expanded={abierto}>
-          <span className="item__title">{item.titulo}</span>
-          <span className="item__meta">
-            {item.fechaLimite && (
-              <span className={`chip ${lim === 'vencido' || lim === 'urgente' ? 'chip--red' : ''}`}>
-                {lim === 'vencido' && <WarningCircle size={13} weight="fill" />}
-                {lim === 'vencido' ? 'Venció el ' : 'Hasta el '}
+      <button
+        type="button"
+        className={`check check--${item.estado}`}
+        onClick={() => editable && onPatch(item, { estado: item.estado === 'listo' ? 'pendiente' : 'listo' })}
+        disabled={!editable}
+        aria-label={item.estado === 'listo' ? `Marcar "${item.titulo}" como pendiente` : `Marcar "${item.titulo}" como listo`}
+        aria-pressed={item.estado === 'listo'}
+      >
+        {item.estado === 'listo' && <Check size={14} weight="bold" />}
+        {item.estado === 'tramite' && <Clock size={13} weight="bold" />}
+      </button>
+
+      <button type="button" className="row__main" onClick={() => onAbrir(item.id)}>
+        <span className="row__title">{item.titulo}</span>
+        {(item.fechaLimite || item.estado === 'tramite' || asignado || item.costo > 0) && (
+          <span className="row__sub">
+            {item.fechaLimite && item.estado !== 'listo' && (
+              <span className={vencido || urgente ? 'is-alert' : ''}>
+                {vencido ? 'Venció el ' : 'Hasta el '}
                 {formatoCorto(item.fechaLimite)}
               </span>
             )}
-            {item.estado === 'tramite' && <span className="chip chip--red">En trámite</span>}
-            {item.costo > 0 && <span className="chip mono">USD {item.costo}</span>}
-            {item.link && (
-              <span className="chip">
-                <LinkSimple size={13} /> Link
-              </span>
-            )}
+            {item.estado === 'tramite' && <span className="is-accent">En trámite</span>}
+            {asignado && <span>{asignado.nombre.split(' ')[0]}</span>}
+            {item.costo > 0 && <span className="mono">USD {item.costo}</span>}
           </span>
-        </button>
+        )}
+      </button>
 
-        {asignado && <Avatar nombre={asignado.nombre} foto={asignado.foto} />}
-        <button type="button" className="icon-btn item__caret" onClick={onToggle} aria-label={abierto ? 'Cerrar detalle' : 'Abrir detalle'}>
-          <CaretDown size={18} />
-        </button>
-      </div>
-
-      {abierto && (
-        <div className="item__detail">
-          {item.desc && <p className="muted item__desc">{item.desc}</p>}
-
-          <div className="detail-grid">
-            <div className="field detail-grid__wide">
-              <span className="field__label">Estado</span>
-              <div className="seg seg--full" role="radiogroup" aria-label="Estado">
-                {ESTADOS.map((e) => (
-                  <button
-                    key={e.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={item.estado === e.id}
-                    className={item.estado === e.id ? 'is-on' : ''}
-                    disabled={!editable}
-                    onClick={() => onPatch(item, { estado: e.id })}
-                  >
-                    {e.nombre}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="field">
-              <label htmlFor={`lim-${item.id}`}>Fecha límite</label>
-              <input
-                id={`lim-${item.id}`}
-                type="date"
-                className="input"
-                defaultValue={item.fechaLimite || ''}
-                disabled={!editable}
-                onBlur={(e) => e.target.value !== (item.fechaLimite || '') && onPatch(item, { fechaLimite: e.target.value || null })}
-              />
-            </div>
-
-            <div className="field">
-              <label htmlFor={`costo-${item.id}`}>Costo estimado (USD)</label>
-              <input
-                id={`costo-${item.id}`}
-                type="number"
-                min="0"
-                inputMode="decimal"
-                className="input"
-                defaultValue={item.costo ?? ''}
-                disabled={!editable}
-                onBlur={(e) => {
-                  const v = e.target.value === '' ? null : Math.max(0, Number(e.target.value));
-                  if (v !== (item.costo ?? null)) onPatch(item, { costo: v });
-                }}
-              />
-            </div>
-
-            <div className="field">
-              <label htmlFor={`asig-${item.id}`}>Responsable</label>
-              <select
-                id={`asig-${item.id}`}
-                className="select"
-                value={item.asignadoA || ''}
-                disabled={!editable}
-                onChange={(e) => onPatch(item, { asignadoA: e.target.value || null })}
-              >
-                <option value="">Sin asignar</option>
-                {miembros.map(([uid, m]) => (
-                  <option key={uid} value={uid}>
-                    {m.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="field">
-              <label htmlFor={`link-${item.id}`}>Link útil</label>
-              <input
-                id={`link-${item.id}`}
-                type="url"
-                className="input"
-                placeholder="https://"
-                defaultValue={item.link || ''}
-                disabled={!editable}
-                onBlur={(e) => e.target.value !== (item.link || '') && onPatch(item, { link: e.target.value.trim() })}
-              />
-            </div>
-
-            <div className="field detail-grid__wide">
-              <label htmlFor={`notas-${item.id}`}>Notas</label>
-              <textarea
-                id={`notas-${item.id}`}
-                className="textarea"
-                maxLength={600}
-                defaultValue={item.notas || ''}
-                disabled={!editable}
-                onBlur={(e) => e.target.value !== (item.notas || '') && onPatch(item, { notas: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div className="item__actions">
-            {item.link && (
-              <a className="btn btn--glass btn--sm" href={item.link} target="_blank" rel="noreferrer">
-                <LinkSimple size={16} /> Abrir link
-              </a>
-            )}
-            {editable && (
-              <button type="button" className="btn btn--ghost btn--sm btn--danger" onClick={() => onDelete(item)}>
-                <Trash size={16} /> Eliminar ítem
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      <CaretRight size={16} className="row__go" aria-hidden="true" />
     </li>
   );
 }
 
-export default function Checklist({ trip, items, editable, store }) {
+function Seccion({ id, todos, visibles, trip, editable, onPatch, onAbrir, onReordenar }) {
+  const listos = todos.filter((i) => i.estado === 'listo').length;
+  const [abierta, setAbierta] = useState(listos < todos.length);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const alSoltar = ({ active, over }) => {
+    if (!over || active.id === over.id) return;
+    const desde = todos.findIndex((i) => i.id === active.id);
+    const hasta = todos.findIndex((i) => i.id === over.id);
+    if (desde < 0 || hasta < 0) return;
+    const nuevo = arrayMove(todos, desde, hasta);
+    const cambios = nuevo
+      .map((it, i) => ({ id: it.id, orden: i * 10, antes: it.orden }))
+      .filter((c) => c.orden !== c.antes)
+      .map(({ id: itemId, orden }) => ({ id: itemId, orden }));
+    if (cambios.length) onReordenar(cambios);
+  };
+
+  return (
+    <section className="sec" aria-labelledby={`sec-${id}`}>
+      <button type="button" className="sec__head" onClick={() => setAbierta((v) => !v)} aria-expanded={abierta}>
+        <span className="sec__ico">
+          <IconoCategoria id={id} />
+        </span>
+        <h3 id={`sec-${id}`}>{CATEGORIAS_POR_ID[id]?.nombre || id}</h3>
+        <span className="mono sec__count">
+          {listos}/{todos.length}
+        </span>
+        <CaretDown size={16} className={`sec__caret ${abierta ? 'is-open' : ''}`} />
+      </button>
+
+      {abierta && (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={alSoltar}>
+          <SortableContext items={visibles.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+            <ul className="rows">
+              {visibles.map((it) => (
+                <Fila key={it.id} item={it} trip={trip} editable={editable} onPatch={onPatch} onAbrir={onAbrir} />
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
+      )}
+    </section>
+  );
+}
+
+export default function Checklist({ trip, items, editable, store, nota }) {
   const toast = useToast();
   const [filtro, setFiltro] = useState('todos');
-  const [abierto, setAbierto] = useState(null);
+  const [abiertoId, setAbiertoId] = useState(null);
+  const [agregarAbierto, setAgregarAbierto] = useState(false);
   const [titulo, setTitulo] = useState('');
   const [categoria, setCategoria] = useState('documentacion');
   const [agregando, setAgregando] = useState(false);
 
   const miembros = useMemo(() => Object.entries(trip.miembrosInfo || {}), [trip.miembrosInfo]);
+  const siguiente = useMemo(() => proximoPaso(items), [items]);
+  const abierto = abiertoId ? items.find((i) => i.id === abiertoId) : null;
 
-  const visibles = useMemo(
-    () => items.filter((i) => filtro === 'todos' || i.estado === filtro),
-    [items, filtro],
-  );
-
-  const porCategoria = useMemo(() => {
+  const secciones = useMemo(() => {
     const m = new Map(CATEGORIAS.map((c) => [c.id, []]));
-    visibles.forEach((i) => (m.get(i.categoria) || m.set(i.categoria, []).get(i.categoria)).push(i));
-    m.forEach((lista) => lista.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)));
-    return [...m.entries()].filter(([, l]) => l.length > 0);
-  }, [visibles]);
+    items.forEach((i) => (m.get(i.categoria) || m.set(i.categoria, []).get(i.categoria)).push(i));
+    return [...m.entries()]
+      .map(([id, todos]) => {
+        const ordenados = [...todos].sort(ordenarItems);
+        return {
+          id,
+          todos: ordenados,
+          visibles: ordenados.filter((i) => filtro === 'todos' || i.estado === filtro),
+        };
+      })
+      .filter((s) => s.visibles.length > 0);
+  }, [items, filtro]);
 
   const patch = async (item, cambios) => {
     try {
@@ -224,10 +202,18 @@ export default function Checklist({ trip, items, editable, store }) {
     }
   };
 
+  const reordenar = async (cambios) => {
+    try {
+      await store.reorderItems(trip.id, cambios);
+    } catch (e) {
+      toast.error(mensajeError(e));
+    }
+  };
+
   const borrar = async (item) => {
     try {
       await store.deleteItem(trip.id, item.id);
-      setAbierto(null);
+      setAbiertoId(null);
       toast.ok('Ítem eliminado.');
     } catch (e) {
       toast.error(mensajeError(e));
@@ -240,6 +226,8 @@ export default function Checklist({ trip, items, editable, store }) {
     if (!t) return;
     setAgregando(true);
     try {
+      const mismos = items.filter((i) => i.categoria === categoria);
+      const ultimo = mismos.length ? Math.max(...mismos.map((i) => i.orden ?? 0)) : -10;
       await store.addItem(trip.id, {
         titulo: t.slice(0, 120),
         categoria,
@@ -252,10 +240,10 @@ export default function Checklist({ trip, items, editable, store }) {
         predeterminado: false,
         clave: null,
         desc: '',
-        orden: Date.now() % 1000000,
+        orden: ultimo + 10,
       });
       setTitulo('');
-      toast.ok('Ítem agregado al checklist.');
+      toast.ok('Ítem agregado.');
     } catch (e) {
       toast.error(mensajeError(e));
     } finally {
@@ -264,97 +252,110 @@ export default function Checklist({ trip, items, editable, store }) {
   };
 
   return (
-    <div className="checklist">
-      <div className="checklist__bar">
-        <div className="seg" role="tablist" aria-label="Filtrar por estado">
-          {FILTROS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              role="tab"
-              aria-selected={filtro === f.id}
-              className={filtro === f.id ? 'is-on' : ''}
-              onClick={() => setFiltro(f.id)}
-            >
-              {f.nombre}
+    <div className="cl">
+      {siguiente ? (
+        <section className="next glass glass--md" aria-label="Siguiente paso">
+          <p className="next__label">Siguiente paso</p>
+          <h2 className="next__title">{siguiente.titulo}</h2>
+          {siguiente.desc && <p className="next__desc muted">{siguiente.desc}</p>}
+          <div className="next__actions">
+            {editable && (
+              <button type="button" className="btn btn--primary btn--sm" onClick={() => patch(siguiente, { estado: 'listo' })}>
+                <Check size={16} weight="bold" /> Marcar como listo
+              </button>
+            )}
+            <button type="button" className="btn btn--ghost btn--sm" onClick={() => setAbiertoId(siguiente.id)}>
+              Ver detalle
             </button>
-          ))}
-        </div>
+          </div>
+        </section>
+      ) : (
+        items.length > 0 && (
+          <section className="next next--done glass glass--md" aria-label="Todo listo">
+            <p className="next__label">Todo listo</p>
+            <h2 className="next__title">Resolviste todo lo de la lista.</h2>
+            <p className="next__desc muted">Buen viaje. Si te falta algo, sumalo con Agregar.</p>
+          </section>
+        )
+      )}
+
+      <div className="cl-bar">
+        <label className="cl-filter">
+          <span className="sr-only">Mostrar</span>
+          <select className="select select--sm" value={filtro} onChange={(e) => setFiltro(e.target.value)}>
+            {FILTROS.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+        {editable ? (
+          <button type="button" className="btn btn--glass btn--sm" onClick={() => setAgregarAbierto((v) => !v)} aria-expanded={agregarAbierto}>
+            <Plus size={16} weight="bold" /> Agregar
+          </button>
+        ) : (
+          <span className="muted cl-ro">Solo lectura</span>
+        )}
       </div>
 
-      {editable && (
-        <form className="add glass glass--md" onSubmit={agregar}>
-          <div className="field add__title">
-            <label htmlFor="nuevo-item">Sumar algo a tu lista</label>
-            <input
-              id="nuevo-item"
-              className="input"
-              placeholder="Ej: Reservar cena de aniversario"
-              value={titulo}
-              maxLength={120}
-              onChange={(e) => setTitulo(e.target.value)}
-            />
-          </div>
-          <div className="field add__cat">
-            <label htmlFor="nuevo-cat">Categoría</label>
-            <select id="nuevo-cat" className="select" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-              {CATEGORIAS.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button type="submit" className="btn btn--primary add__btn" disabled={agregando || !titulo.trim()}>
-            {agregando ? <span className="spinner" /> : <Plus size={18} weight="bold" />}
-            Agregar
+      {editable && agregarAbierto && (
+        <form className="addrow" onSubmit={agregar}>
+          <input
+            autoFocus
+            className="input"
+            placeholder="Ej: Reservar cena de aniversario"
+            aria-label="Nuevo ítem"
+            value={titulo}
+            maxLength={120}
+            onChange={(e) => setTitulo(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && setAgregarAbierto(false)}
+          />
+          <select className="select" aria-label="Categoría" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+            {CATEGORIAS.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+          <button type="submit" className="btn btn--primary" disabled={agregando || !titulo.trim()}>
+            {agregando ? <span className="spinner" /> : 'Agregar'}
           </button>
         </form>
       )}
 
-      {!editable && <p className="notice muted">Tenés acceso de solo lectura: podés seguir el avance pero no modificarlo.</p>}
-
-      {porCategoria.length === 0 && (
-        <div className="empty glass">
-          <Check size={34} weight="bold" />
-          <h2>No hay ítems en este filtro</h2>
-          <p className="muted">Probá con otro estado o agregá algo nuevo a la lista.</p>
-        </div>
+      {secciones.length === 0 && (
+        <p className="muted cl-empty">No hay ítems en este filtro. Probá con otro o agregá algo nuevo.</p>
       )}
 
-      <div className="cats">
-        {porCategoria.map(([id, lista]) => {
-          const listos = lista.filter((i) => i.estado === 'listo').length;
-          return (
-            <section key={id} className="cat glass" aria-labelledby={`cat-${id}`}>
-              <header className="cat__head">
-                <span className="cat__ico">
-                  <IconoCategoria id={id} />
-                </span>
-                <h3 id={`cat-${id}`}>{CATEGORIAS_POR_ID[id]?.nombre || id}</h3>
-                <span className="mono muted">
-                  {listos}/{lista.length}
-                </span>
-              </header>
-              <ul>
-                {lista.map((it) => (
-                  <FilaItem
-                    key={it.id}
-                    item={it}
-                    trip={trip}
-                    editable={editable}
-                    miembros={miembros}
-                    abierto={abierto === it.id}
-                    onToggle={() => setAbierto((a) => (a === it.id ? null : it.id))}
-                    onPatch={patch}
-                    onDelete={borrar}
-                  />
-                ))}
-              </ul>
-            </section>
-          );
-        })}
+      <div className="secs">
+        {secciones.map((s) => (
+          <Seccion
+            key={s.id}
+            id={s.id}
+            todos={s.todos}
+            visibles={s.visibles}
+            trip={trip}
+            editable={editable}
+            onPatch={patch}
+            onAbrir={setAbiertoId}
+            onReordenar={reordenar}
+          />
+        ))}
       </div>
+
+      {nota && <p className="foot-note">{nota}</p>}
+
+      {abierto && (
+        <ItemDrawer
+          item={abierto}
+          editable={editable}
+          miembros={miembros}
+          onPatch={patch}
+          onDelete={borrar}
+          onClose={() => setAbiertoId(null)}
+        />
+      )}
     </div>
   );
 }

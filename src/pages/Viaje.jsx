@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
-  CalendarBlank,
+  DotsThreeVertical,
   ListChecks,
   LockSimple,
   PencilSimple,
   ShareNetwork,
   Sparkle,
+  Trash,
   Users,
   Wallet,
 } from '@phosphor-icons/react';
@@ -17,8 +18,8 @@ import Nav from '../components/Nav.jsx';
 import { Cargando, Modal, ProgressRing, useToast } from '../components/ui.jsx';
 import { DESTINOS_POR_ID, foto } from '../data/destinos.js';
 import { verificadoPara } from '../data/requisitos.js';
-import { diasEntre, diasParaViaje, fechaLimite, formatoCorto, formatoLargo, hoyISO } from '../lib/fechas.js';
-import { mensajeError, puedeEditar, resumenItems, ROLES } from '../lib/viajes.js';
+import { diasParaViaje, formatoCorto, formatoLargo } from '../lib/fechas.js';
+import { estaVencido, mensajeError, puedeEditar, resumenItems, ROLES } from '../lib/viajes.js';
 import Checklist from './viaje/Checklist.jsx';
 import Recomendados from './viaje/Recomendados.jsx';
 import Presupuesto from './viaje/Presupuesto.jsx';
@@ -31,7 +32,7 @@ const TABS = [
   { id: 'grupo', nombre: 'Grupo', Icono: Users },
 ];
 
-function EditarViaje({ trip, items, store, onClose }) {
+function EditarViaje({ trip, store, onClose }) {
   const toast = useToast();
   const [nombre, setNombre] = useState(trip.nombre);
   const [ida, setIda] = useState(trip.fechaIda);
@@ -59,14 +60,6 @@ function EditarViaje({ trip, items, store, onClose }) {
         fechaVuelta: vuelta,
         viajeros: Number(viajeros),
       });
-      if (ida !== trip.fechaIda) {
-        // Los ítems predeterminados recalculan su fecha límite con la nueva salida
-        await Promise.all(
-          items
-            .filter((i) => i.predeterminado && i.diasAntes != null)
-            .map((i) => store.updateItem(trip.id, i.id, { fechaLimite: fechaLimite(ida, i.diasAntes) })),
-        );
-      }
       toast.ok('Viaje actualizado.');
       onClose();
     } catch (err) {
@@ -106,9 +99,6 @@ function EditarViaje({ trip, items, store, onClose }) {
           />
           {errores.viajeros && <span className="field__error">{errores.viajeros}</span>}
         </div>
-        {ida !== trip.fechaIda && (
-          <p className="field__hint form-grid__wide">Al cambiar la salida, las fechas límite de la lista se recalculan.</p>
-        )}
         <div className="form-grid__wide modal__foot">
           <button type="button" className="btn btn--ghost" onClick={onClose}>
             Cancelar
@@ -120,6 +110,91 @@ function EditarViaje({ trip, items, store, onClose }) {
         </div>
       </form>
     </Modal>
+  );
+}
+
+function EliminarViaje({ trip, store, onClose }) {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const [borrando, setBorrando] = useState(false);
+
+  const confirmar = async () => {
+    setBorrando(true);
+    try {
+      await store.deleteTrip(trip.id);
+      toast.ok('Viaje eliminado.');
+      navigate('/viajes', { replace: true });
+    } catch (e) {
+      toast.error(mensajeError(e));
+      setBorrando(false);
+    }
+  };
+
+  return (
+    <Modal titulo="Eliminar viaje" onClose={onClose}>
+      <p className="muted">
+        Se borran <strong>{trip.nombre}</strong>, su checklist y los accesos de todo el grupo. No se puede deshacer.
+      </p>
+      <div className="modal__foot">
+        <button type="button" className="btn btn--ghost" onClick={onClose}>
+          Cancelar
+        </button>
+        <button type="button" className="btn btn--primary" onClick={confirmar} disabled={borrando}>
+          {borrando && <span className="spinner" />}
+          Eliminar definitivamente
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function MenuViaje({ onEditar, onCompartir, onEliminar }) {
+  const [abierto, setAbierto] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!abierto) return undefined;
+    const fuera = (e) => !ref.current?.contains(e.target) && setAbierto(false);
+    const tecla = (e) => e.key === 'Escape' && setAbierto(false);
+    document.addEventListener('mousedown', fuera);
+    document.addEventListener('keydown', tecla);
+    return () => {
+      document.removeEventListener('mousedown', fuera);
+      document.removeEventListener('keydown', tecla);
+    };
+  }, [abierto]);
+
+  const accion = (fn) => () => {
+    setAbierto(false);
+    fn();
+  };
+
+  return (
+    <div className="menu" ref={ref}>
+      <button
+        type="button"
+        className="icon-btn"
+        aria-haspopup="menu"
+        aria-expanded={abierto}
+        aria-label="Más acciones del viaje"
+        onClick={() => setAbierto((v) => !v)}
+      >
+        <DotsThreeVertical size={22} weight="bold" />
+      </button>
+      {abierto && (
+        <div className="menu__list glass glass--md" role="menu">
+          <button type="button" role="menuitem" onClick={accion(onEditar)}>
+            <PencilSimple size={18} /> Editar viaje
+          </button>
+          <button type="button" role="menuitem" onClick={accion(onCompartir)}>
+            <ShareNetwork size={18} /> Compartir
+          </button>
+          <button type="button" role="menuitem" className="is-danger" onClick={accion(onEliminar)}>
+            <Trash size={18} /> Eliminar viaje
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -149,6 +224,7 @@ export default function Viaje() {
   const { user, store } = useAuth();
   const [params, setParams] = useSearchParams();
   const [editando, setEditando] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
 
   const tab = TABS.some((t) => t.id === params.get('tab')) ? params.get('tab') : 'checklist';
 
@@ -198,7 +274,7 @@ export default function Viaje() {
         <div className="stage stage--aurora" aria-hidden="true" />
         <div className="page">
           <Nav />
-          <main className="app container">
+          <main className="trip container">
             <div className="skeleton trip-head-skel" />
             <Cargando texto="Abriendo tu viaje" />
           </main>
@@ -219,11 +295,11 @@ export default function Viaje() {
 
   const dest = DESTINOS_POR_ID[trip.destinoId];
   const dias = diasParaViaje(trip.fechaIda);
-  const noches = diasEntre(trip.fechaIda, trip.fechaVuelta);
   const verificado = verificadoPara(trip.destinoId);
-  const vencidos = (items || []).filter(
-    (i) => i.estado !== 'listo' && i.fechaLimite && i.fechaLimite < hoyISO(),
-  ).length;
+  const vencidos = (items || []).filter(estaVencido).length;
+  const nota = verificado
+    ? `Los requisitos de ingreso cambian. Esta lista se armó con información pública al ${formatoLargo(verificado)}: confirmá cada trámite en el sitio oficial.`
+    : null;
 
   return (
     <>
@@ -237,79 +313,58 @@ export default function Viaje() {
             <ArrowLeft size={16} /> Mis viajes
           </Link>
 
-          <header className="trip-head glass">
-            <div className="trip-head__main">
-              <p className="trip-head__dest">
+          <header className="tv-head glass">
+            <div className="tv-head__text">
+              <p className="tv-head__dest">
                 {dest?.ciudadPrincipal}, {dest?.nombre}
+                {rol && rol !== 'owner' && <span className="tv-head__role">{ROLES[rol]}</span>}
               </p>
-              <h1 className="trip-head__title">{trip.nombre}</h1>
-              <div className="trip-head__chips">
-                <span className="chip">
-                  <CalendarBlank size={14} /> {formatoLargo(trip.fechaIda)} a {formatoCorto(trip.fechaVuelta)}
+              <h1 className="tv-head__title">{trip.nombre}</h1>
+              <p className="tv-head__meta">
+                <span className="mono">
+                  {formatoCorto(trip.fechaIda)} a {formatoCorto(trip.fechaVuelta)}
                 </span>
-                <span className="chip">{noches} noches</span>
-                <span className="chip">
-                  <Users size={14} /> {trip.viajeros} {trip.viajeros === 1 ? 'viajero' : 'viajeros'}
+                <span>
+                  {trip.viajeros} {trip.viajeros === 1 ? 'viajero' : 'viajeros'}
                 </span>
-                {dias != null && dias >= 0 && <span className="chip chip--red">Faltan {dias} días</span>}
-                {rol && rol !== 'owner' && <span className="chip">{ROLES[rol]}</span>}
-              </div>
-              <div className="trip-head__actions">
-                {rol === 'owner' && (
-                  <>
-                    <button type="button" className="btn btn--glass btn--sm" onClick={() => setEditando(true)}>
-                      <PencilSimple size={16} /> Editar
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--primary btn--sm"
-                      onClick={() => setParams({ tab: 'grupo' })}
-                    >
-                      <ShareNetwork size={16} /> Compartir
-                    </button>
-                  </>
+                {dias != null && dias >= 0 && <span className="is-accent">Faltan {dias} días</span>}
+                {vencidos > 0 && (
+                  <span className="is-accent">
+                    {vencidos} {vencidos === 1 ? 'vencido' : 'vencidos'}
+                  </span>
                 )}
-              </div>
-            </div>
-            <div className="trip-head__progress">
-              <ProgressRing value={progreso.avance} size={104} stroke={8} />
-              <p className="mono">
-                {progreso.listos} de {progreso.total}
-              </p>
-              <p className="muted trip-head__small">
-                {vencidos > 0 ? `${vencidos} con fecha vencida` : progreso.tramite > 0 ? `${progreso.tramite} en trámite` : 'listos'}
               </p>
             </div>
+            <ProgressRing value={progreso.avance} size={68} stroke={6} />
+            {rol === 'owner' && (
+              <MenuViaje
+                onEditar={() => setEditando(true)}
+                onCompartir={() => setParams({ tab: 'grupo' })}
+                onEliminar={() => setEliminando(true)}
+              />
+            )}
           </header>
 
-          <nav className="tabs glass" aria-label="Secciones del viaje">
+          <nav className="tv-tabs" aria-label="Secciones del viaje">
             {TABS.map(({ id: tid, nombre, Icono }) => (
               <button
                 key={tid}
                 type="button"
                 className={tab === tid ? 'is-on' : ''}
-                aria-label={nombre}
                 aria-current={tab === tid ? 'page' : undefined}
-                onClick={() => setParams(tid === 'checklist' ? {} : { tab: tid })}
+                onClick={() => {
+                  setParams(tid === 'checklist' ? {} : { tab: tid });
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
               >
-                <Icono size={18} weight={tab === tid ? 'fill' : 'regular'} />
+                <Icono size={22} weight={tab === tid ? 'fill' : 'regular'} />
                 <span>{nombre}</span>
               </button>
             ))}
           </nav>
 
           <div className="trip-body">
-            {tab === 'checklist' && (
-              <>
-                {verificado && (
-                  <p className="notice">
-                    Los requisitos de ingreso cambian. Esta lista se armó con información pública al{' '}
-                    {formatoLargo(verificado)}: confirmá cada trámite en el link oficial de cada ítem.
-                  </p>
-                )}
-                <Checklist trip={trip} items={items} editable={editable} store={store} />
-              </>
-            )}
+            {tab === 'checklist' && <Checklist trip={trip} items={items} editable={editable} store={store} nota={nota} />}
             {tab === 'recomendados' && <Recomendados trip={trip} items={items} editable={editable} store={store} />}
             {tab === 'presupuesto' && <Presupuesto trip={trip} items={items} />}
             {tab === 'grupo' && <Grupo trip={trip} user={user} store={store} />}
@@ -317,7 +372,8 @@ export default function Viaje() {
         </main>
       </div>
 
-      {editando && <EditarViaje trip={trip} items={items} store={store} onClose={() => setEditando(false)} />}
+      {editando && <EditarViaje trip={trip} store={store} onClose={() => setEditando(false)} />}
+      {eliminando && <EliminarViaje trip={trip} store={store} onClose={() => setEliminando(false)} />}
     </>
   );
 }

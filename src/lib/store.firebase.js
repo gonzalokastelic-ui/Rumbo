@@ -99,6 +99,13 @@ export function createFirebaseStore(db) {
       return deleteDoc(doc(db, 'trips', tripId, 'items', itemId));
     },
 
+    // Guarda el nuevo orden de varios items en una sola escritura atomica
+    reorderItems(tripId, cambios) {
+      const batch = writeBatch(db);
+      cambios.forEach(({ id, orden }) => batch.update(doc(db, 'trips', tripId, 'items', id), { orden }));
+      return batch.commit();
+    },
+
     // Invitaciones por link con rol
     async createInvite(user, tripId, rol) {
       const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 8);

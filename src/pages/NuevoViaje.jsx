@@ -70,7 +70,7 @@ export default function NuevoViaje() {
           plantilla,
           resumen: { total: cantidadItems, listos: 0, tramite: 0 },
         },
-        itemsIniciales(destinoId, plantilla, ida),
+        itemsIniciales(destinoId, plantilla),
       );
       toast.ok('Tu viaje está listo. Empezá a tachar.');
       navigate(`/viaje/${id}`, { replace: true });
