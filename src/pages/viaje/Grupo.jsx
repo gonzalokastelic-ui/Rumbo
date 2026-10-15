@@ -4,6 +4,7 @@ import { Copy, Eye, LinkSimple, PencilSimple, SignOut, Trash } from '@phosphor-i
 import { useSub } from '../../lib/useSub.js';
 import { mensajeError, ROLES } from '../../lib/viajes.js';
 import { Avatar, useToast } from '../../components/ui.jsx';
+import { GRUPOS_POR_ID } from '../../data/pasajeros.js';
 
 const linkDe = (token) => `${window.location.origin}/unirse/${token}`;
 
@@ -83,11 +84,36 @@ export default function Grupo({ trip, user, store }) {
     }
   };
 
+  const pasajeros = trip.pasajeros || [];
+
   return (
     <div className="group">
+      {pasajeros.length > 0 && (
+        <section className="glass cat" aria-labelledby="g-pasajeros">
+          <header className="cat__head">
+            <h3 id="g-pasajeros">Pasajeros</h3>
+            <span className="mono muted">{pasajeros.length}</span>
+          </header>
+          <ul className="members">
+            {pasajeros.map((p) => (
+              <li key={p.id}>
+                <Avatar nombre={p.nombre} />
+                <div className="members__name">
+                  <strong>{p.nombre}</strong>
+                  <span className="muted">
+                    {GRUPOS_POR_ID[p.edad]?.nombre || 'Adulto'}, {p.nacionalidad}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {esOwner && <p className="muted notice">Para cambiar los pasajeros usá el menú del viaje, Editar viaje.</p>}
+        </section>
+      )}
+
       <section className="glass cat" aria-labelledby="g-miembros">
         <header className="cat__head">
-          <h3 id="g-miembros">Quiénes viajan</h3>
+          <h3 id="g-miembros">Quiénes organizan</h3>
           <span className="mono muted">{miembros.length} con acceso</span>
         </header>
         <ul className="members">

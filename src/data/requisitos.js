@@ -25,7 +25,6 @@ export const ESTADOS = [
 export const PLANTILLAS = [
   { id: 'vacaciones', nombre: 'Vacaciones', desc: 'El checklist estándar para descansar.' },
   { id: 'escapada', nombre: 'Escapada corta', desc: 'Fin de semana largo, equipaje de mano.' },
-  { id: 'familia', nombre: 'En familia', desc: 'Suma trámites y reservas para menores.' },
   { id: 'mochilero', nombre: 'Mochilero', desc: 'Presupuesto ajustado y reservas flexibles.' },
   { id: 'trabajo', nombre: 'Trabajo o estudio', desc: 'Documentos y conectividad para rendir.' },
 ];
@@ -268,26 +267,6 @@ const porPlantilla = {
       desc: 'Revisá medidas y peso de cabina de tu aerolínea para no pagar de más.',
     },
   ],
-  familia: [
-    {
-      key: 'menores',
-      titulo: 'Autorización de viaje para menores',
-      categoria: 'documentacion',
-      desc: 'Si un menor viaja sin alguno de sus padres, necesita autorización certificada.',
-    },
-    {
-      key: 'asientos',
-      titulo: 'Asientos juntos y cuna o butaca',
-      categoria: 'transporte',
-      desc: 'Elegí los asientos al comprar y consultá por servicios para bebés.',
-    },
-    {
-      key: 'botiquin',
-      titulo: 'Botiquín y medicación habitual',
-      categoria: 'salud',
-      desc: 'Llevá las recetas y medicación en el equipaje de mano.',
-    },
-  ],
   mochilero: [
     {
       key: 'seguro-extendido',
@@ -318,10 +297,71 @@ const porPlantilla = {
   ],
 };
 
-export function requisitosPara(destinoId, plantillaId = 'vacaciones') {
+// Requisitos que dependen de quienes viajan. `aplica` decide a que pasajeros
+// alcanza: si no alcanza a ninguno, el item no se agrega.
+const esMenor = (p) => p.edad === 'menor' || p.edad === 'bebe';
+const porPasajeros = [
+  {
+    key: 'menores',
+    titulo: 'Autorización de viaje para menores',
+    categoria: 'documentacion',
+    desc: 'Si un menor viaja sin alguno de sus padres, necesita una autorización certificada ante escribano o juez.',
+    link: 'https://www.argentina.gob.ar',
+    porPersona: true,
+    aplica: esMenor,
+  },
+  {
+    key: 'bebe-asiento',
+    titulo: 'Asiento, cuna o butaca para el bebé',
+    categoria: 'transporte',
+    desc: 'Consultá a la aerolínea por cuna a bordo y cómo viaja el cochecito.',
+    aplica: (p) => p.edad === 'bebe',
+  },
+  {
+    key: 'botiquin',
+    titulo: 'Botiquín y medicación habitual de los chicos',
+    categoria: 'salud',
+    desc: 'Llevá recetas y medicación en el equipaje de mano.',
+    aplica: esMenor,
+  },
+  {
+    key: 'seguro-mayores',
+    titulo: 'Seguro con cobertura para mayores de 65',
+    categoria: 'salud',
+    desc: 'Muchos seguros limitan la cobertura por edad. Confirmá topes y enfermedades preexistentes.',
+    porPersona: true,
+    aplica: (p) => p.edad === 'mayor',
+  },
+  {
+    key: 'otra-nacionalidad',
+    titulo: 'Requisitos para pasaporte no argentino',
+    categoria: 'documentacion',
+    desc: 'Esta lista está pensada para pasaporte argentino. Revisá visa y requisitos de ingreso para cada nacionalidad en el consulado del destino.',
+    porPersona: true,
+    aplica: (p) => Boolean(p.nacionalidad) && p.nacionalidad !== 'Argentina',
+  },
+];
+
+// Trámites que cada pasajero resuelve por su cuenta: un solo item con la lista de personas adentro
+const POR_PERSONA = new Set(['documento', 'visa', 'ds160', 'etias', 'fmm', 'ingreso', 'seguro', 'seguro-extendido']);
+
+export function requisitosPara(destinoId, plantillaId = 'vacaciones', pasajeros = []) {
   const d = porDestino[destinoId];
   const extras = porPlantilla[plantillaId] || [];
-  return [...(d ? d.items : []), ...base, ...extras].map((it) => ({ ...it }));
+  const generales = [...(d ? d.items : []), ...base, ...extras].map((it) => ({
+    ...it,
+    porPersona: POR_PERSONA.has(it.key),
+  }));
+  const segunPasajeros = porPasajeros
+    .filter((it) => pasajeros.some(it.aplica))
+    .map((it) => ({ ...it, porPersona: Boolean(it.porPersona) }));
+  return [...generales, ...segunPasajeros];
+}
+
+// A que pasajeros alcanza un item por persona (por defecto, a todos)
+export function pasajerosPara(clave, pasajeros = []) {
+  const def = porPasajeros.find((it) => it.key === clave);
+  return def ? pasajeros.filter(def.aplica) : pasajeros;
 }
 
 export function verificadoPara(destinoId) {

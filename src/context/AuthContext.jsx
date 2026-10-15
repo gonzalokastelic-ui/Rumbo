@@ -56,8 +56,19 @@ export function AuthProvider({ children }) {
         if (cancelado) return;
         fb.current = { auth };
         const store = createFirebaseStore(db);
-        desuscribir = onAuthStateChanged(auth, (u) => {
-          setEstado({ listo: true, user: u ? normalizar(u) : null, store });
+        desuscribir = onAuthStateChanged(auth, async (u) => {
+          if (!u) {
+            setEstado({ listo: true, user: null, store, perfil: null, perfilListo: true });
+            return;
+          }
+          setEstado({ listo: true, user: normalizar(u), store, perfil: null, perfilListo: false });
+          let perfil = null;
+          try {
+            perfil = await store.getProfile(u.uid);
+          } catch (e) {
+            console.error('No se pudo leer el perfil', e);
+          }
+          setEstado((s) => (s.user?.uid === u.uid ? { ...s, perfil, perfilListo: true } : s));
         });
       } catch (e) {
         console.error('No se pudo iniciar Firebase', e);
@@ -94,9 +105,24 @@ export function AuthProvider({ children }) {
       listo: true,
       user: { uid: 'demo-user', displayName: 'Viajera demo', email: null, photoURL: null },
       store: demoStore.current,
+      perfil: { nombre: 'Viajera demo', nacimiento: '1996-05-10', nacionalidad: 'Argentina' },
+      perfilListo: true,
       demo: true,
     });
   }, []);
+
+  // Guarda los datos minimos del perfil (nombre, nacimiento, nacionalidad)
+  const guardarPerfil = useCallback(
+    async (datos) => {
+      await estado.store.saveProfile(estado.user.uid, datos);
+      if (!estado.demo && fb.current?.auth?.currentUser && datos.nombre) {
+        const { updateProfile } = await import('firebase/auth');
+        await updateProfile(fb.current.auth.currentUser, { displayName: datos.nombre }).catch(() => {});
+      }
+      setEstado((s) => ({ ...s, perfil: { ...s.perfil, ...datos }, perfilListo: true }));
+    },
+    [estado.store, estado.user, estado.demo],
+  );
 
   const salir = useCallback(async () => {
     if (!hasFirebase || estado.demo) {
@@ -110,14 +136,17 @@ export function AuthProvider({ children }) {
   const valor = useMemo(
     () => ({
       ...estado,
+      // El nombre del perfil manda sobre el de la cuenta de Google
+      user: estado.user ? { ...estado.user, displayName: estado.perfil?.nombre || estado.user.displayName } : null,
       hasFirebase,
+      guardarPerfil,
       entrarConGoogle,
       entrarConEmail,
       crearCuenta,
       entrarDemo,
       salir,
     }),
-    [estado, entrarConGoogle, entrarConEmail, crearCuenta, entrarDemo, salir],
+    [estado, entrarConGoogle, entrarConEmail, crearCuenta, entrarDemo, salir, guardarPerfil],
   );
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>;

@@ -1,62 +1,64 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, Minus, Plus } from '@phosphor-icons/react';
+import { ArrowLeft, ArrowRight, Check } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext.jsx';
 import Nav from '../components/Nav.jsx';
 import { useToast } from '../components/ui.jsx';
+import { RangoFechas } from '../components/Calendario.jsx';
+import PasajerosEditor, { limpiarPasajeros, validarPasajeros } from '../components/Pasajeros.jsx';
 import { DESTINOS, DESTINOS_POR_ID, ORIGEN, foto } from '../data/destinos.js';
 import { PLANTILLAS, requisitosPara } from '../data/requisitos.js';
-import { diasEntre, hoyISO, sumarDias } from '../lib/fechas.js';
+import { titularDesdePerfil } from '../data/pasajeros.js';
+import { diasEntre, hoyISO } from '../lib/fechas.js';
 import { itemsIniciales, mensajeError } from '../lib/viajes.js';
 
-const PASOS = ['Destino', 'Fechas y personas', 'Tipo de viaje'];
+const PASOS = ['Destino', 'Fechas', 'Pasajeros', 'Tipo de viaje'];
+const SEGUN_PASAJEROS = new Set(['menores', 'bebe-asiento', 'botiquin', 'seguro-mayores', 'otra-nacionalidad']);
 
 export default function NuevoViaje() {
-  const { user, store } = useAuth();
+  const { user, perfil, store } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
 
   const [paso, setPaso] = useState(0);
   const [destinoId, setDestinoId] = useState(null);
   const [nombre, setNombre] = useState('');
-  const [ida, setIda] = useState('');
-  const [vuelta, setVuelta] = useState('');
-  const [viajeros, setViajeros] = useState(1);
+  const [fechas, setFechas] = useState({ desde: null, hasta: null });
+  const [pasajeros, setPasajeros] = useState(() => [titularDesdePerfil(user, perfil)]);
   const [plantilla, setPlantilla] = useState('vacaciones');
   const [errores, setErrores] = useState({});
   const [guardando, setGuardando] = useState(false);
 
   const destino = destinoId ? DESTINOS_POR_ID[destinoId] : null;
-  const cantidadItems = useMemo(
-    () => (destinoId ? requisitosPara(destinoId, plantilla).length : 0),
-    [destinoId, plantilla],
+  const requisitos = useMemo(
+    () => (destinoId ? requisitosPara(destinoId, plantilla, pasajeros) : []),
+    [destinoId, plantilla, pasajeros],
   );
+  const extrasPasajeros = requisitos.filter((r) => SEGUN_PASAJEROS.has(r.key));
 
-  const validarFechas = () => {
+  const validar = () => {
     const e = {};
-    if (nombre.trim().length > 80) e.nombre = 'Máximo 80 caracteres.';
-    if (!ida) e.ida = 'Elegí la fecha de salida.';
-    else if (ida < hoyISO()) e.ida = 'La salida no puede ser en el pasado.';
-    if (!vuelta) e.vuelta = 'Elegí la fecha de regreso.';
-    else if (ida && vuelta <= ida) e.vuelta = 'El regreso tiene que ser después de la salida.';
-    else if (ida && diasEntre(ida, vuelta) > 90) e.vuelta = 'El viaje no puede superar los 90 días.';
+    if (paso === 0 && !destinoId) e.destino = 'Elegí un destino para continuar.';
+    if (paso === 1) {
+      if (!fechas.desde) e.fechas = 'Elegí la fecha de salida.';
+      else if (!fechas.hasta) e.fechas = 'Elegí la fecha de vuelta.';
+      else if (diasEntre(fechas.desde, fechas.hasta) > 90) e.fechas = 'El viaje no puede superar los 90 días.';
+      if (nombre.trim().length > 80) e.nombre = 'Máximo 80 caracteres.';
+    }
+    if (paso === 2) Object.assign(e, validarPasajeros(pasajeros));
     setErrores(e);
     return Object.keys(e).length === 0;
   };
 
   const siguiente = () => {
-    if (paso === 0 && !destinoId) {
-      setErrores({ destino: 'Elegí un destino para continuar.' });
-      return;
-    }
-    if (paso === 1 && !validarFechas()) return;
-    setErrores({});
+    if (!validar()) return;
     setPaso((p) => p + 1);
   };
 
   const crear = async () => {
     setGuardando(true);
     try {
+      const lista = limpiarPasajeros(pasajeros);
       const nombreFinal = nombre.trim() || `${destino.ciudadPrincipal}, ${destino.nombre}`;
       const id = await store.createTrip(
         user,
@@ -64,13 +66,14 @@ export default function NuevoViaje() {
           nombre: nombreFinal,
           destinoId,
           origen: ORIGEN.pais,
-          fechaIda: ida,
-          fechaVuelta: vuelta,
-          viajeros,
+          fechaIda: fechas.desde,
+          fechaVuelta: fechas.hasta,
+          viajeros: lista.length,
+          pasajeros: lista,
           plantilla,
-          resumen: { total: cantidadItems, listos: 0, tramite: 0 },
+          resumen: { total: requisitos.length, listos: 0, tramite: 0 },
         },
-        itemsIniciales(destinoId, plantilla),
+        itemsIniciales(destinoId, plantilla, lista),
       );
       toast.ok('Tu viaje está listo. Empezá a tachar.');
       navigate(`/viaje/${id}`, { replace: true });
@@ -141,75 +144,53 @@ export default function NuevoViaje() {
             {paso === 1 && (
               <>
                 <h2 className="wizard__h">
-                  {destino.ciudadPrincipal}, {destino.nombre}
+                  ¿Cuándo viajás a {destino.ciudadPrincipal}?
                 </h2>
-                <div className="form-grid">
-                  <div className="field form-grid__wide">
-                    <label htmlFor="nombre">Nombre del viaje</label>
-                    <input
-                      id="nombre"
-                      className="input"
-                      placeholder={`${destino.ciudadPrincipal}, ${destino.nombre}`}
-                      value={nombre}
-                      maxLength={80}
-                      onChange={(e) => setNombre(e.target.value)}
-                    />
-                    <span className="field__hint">Opcional. Si lo dejás vacío usamos el destino.</span>
-                    {errores.nombre && <span className="field__error">{errores.nombre}</span>}
-                  </div>
-                  <div className="field">
-                    <label htmlFor="ida">Salida</label>
-                    <input
-                      id="ida"
-                      type="date"
-                      className="input"
-                      min={hoyISO()}
-                      value={ida}
-                      onChange={(e) => {
-                        setIda(e.target.value);
-                        if (!vuelta && e.target.value) setVuelta(sumarDias(e.target.value, 7));
-                        setErrores((x) => ({ ...x, ida: undefined, vuelta: undefined }));
-                      }}
-                      aria-invalid={Boolean(errores.ida)}
-                    />
-                    {errores.ida && <span className="field__error">{errores.ida}</span>}
-                  </div>
-                  <div className="field">
-                    <label htmlFor="vuelta">Regreso</label>
-                    <input
-                      id="vuelta"
-                      type="date"
-                      className="input"
-                      min={ida || hoyISO()}
-                      value={vuelta}
-                      onChange={(e) => {
-                        setVuelta(e.target.value);
-                        setErrores((x) => ({ ...x, vuelta: undefined }));
-                      }}
-                      aria-invalid={Boolean(errores.vuelta)}
-                    />
-                    {errores.vuelta && <span className="field__error">{errores.vuelta}</span>}
-                  </div>
-                  <div className="field form-grid__wide">
-                    <span className="field__label" id="viajeros-l">
-                      Cantidad de viajeros
-                    </span>
-                    <div className="stepper" role="group" aria-labelledby="viajeros-l">
-                      <button type="button" className="icon-btn" onClick={() => setViajeros((v) => Math.max(1, v - 1))} aria-label="Menos viajeros">
-                        <Minus size={18} />
-                      </button>
-                      <output className="mono">{viajeros}</output>
-                      <button type="button" className="icon-btn" onClick={() => setViajeros((v) => Math.min(20, v + 1))} aria-label="Más viajeros">
-                        <Plus size={18} />
-                      </button>
-                    </div>
-                    <span className="field__hint">Después podés invitar a los demás con un link.</span>
-                  </div>
+                <RangoFechas
+                  desde={fechas.desde}
+                  hasta={fechas.hasta}
+                  min={hoyISO()}
+                  onChange={(f) => {
+                    setFechas(f);
+                    setErrores((x) => ({ ...x, fechas: undefined }));
+                  }}
+                  error={errores.fechas}
+                />
+                <div className="field wizard__name">
+                  <label htmlFor="nombre">Nombre del viaje (opcional)</label>
+                  <input
+                    id="nombre"
+                    className="input"
+                    placeholder={`${destino.ciudadPrincipal}, ${destino.nombre}`}
+                    value={nombre}
+                    maxLength={80}
+                    onChange={(e) => setNombre(e.target.value)}
+                  />
+                  {errores.nombre && <span className="field__error">{errores.nombre}</span>}
                 </div>
               </>
             )}
 
             {paso === 2 && (
+              <>
+                <h2 className="wizard__h">¿Quiénes viajan?</h2>
+                <p className="muted wizard__lead">
+                  Con la edad y la nacionalidad de cada pasajero sumamos los requisitos que correspondan, por ejemplo la
+                  autorización para menores.
+                </p>
+                <PasajerosEditor
+                  pasajeros={pasajeros}
+                  onChange={(lista) => {
+                    setPasajeros(lista);
+                    setErrores({});
+                  }}
+                  uidTitular={user.uid}
+                  errores={errores}
+                />
+              </>
+            )}
+
+            {paso === 3 && (
               <>
                 <h2 className="wizard__h">¿Qué tipo de viaje es?</h2>
                 <div className="tpl-grid" role="radiogroup" aria-label="Tipo de viaje">
@@ -228,9 +209,22 @@ export default function NuevoViaje() {
                   ))}
                 </div>
                 <p className="wizard__sum">
-                  Vamos a crear <strong className="mono">{cantidadItems}</strong> ítems para{' '}
-                  <strong>{destino.nombre}</strong>. Después los editás a tu gusto.
+                  Vamos a crear <strong className="mono">{requisitos.length}</strong> ítems para{' '}
+                  <strong>{destino.nombre}</strong> y <strong className="mono">{pasajeros.length}</strong>{' '}
+                  {pasajeros.length === 1 ? 'pasajero' : 'pasajeros'}. Después los editás a tu gusto.
                 </p>
+                {extrasPasajeros.length > 0 && (
+                  <div className="wizard__extras">
+                    <p className="field__label">Según quiénes viajan, sumamos:</p>
+                    <ul>
+                      {extrasPasajeros.map((r) => (
+                        <li key={r.key} className="chip chip--red">
+                          {r.titulo}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </>
             )}
 
@@ -242,7 +236,7 @@ export default function NuevoViaje() {
               ) : (
                 <span />
               )}
-              {paso < 2 ? (
+              {paso < PASOS.length - 1 ? (
                 <button type="button" className="btn btn--primary" onClick={siguiente}>
                   Continuar <ArrowRight size={16} weight="bold" />
                 </button>

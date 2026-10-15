@@ -64,7 +64,7 @@ export function createFirebaseStore(db) {
       items.forEach((it, i) => {
         batch.set(doc(collection(db, 'trips', tripRef.id, 'items')), {
           ...it,
-          orden: i,
+          orden: it.orden ?? i * 10,
           creado: serverTimestamp(),
         });
       });
@@ -77,9 +77,13 @@ export function createFirebaseStore(db) {
     },
 
     async deleteTrip(tripId) {
-      const items = await getDocs(collection(db, 'trips', tripId, 'items'));
+      const [items, eventos] = await Promise.all([
+        getDocs(collection(db, 'trips', tripId, 'items')),
+        getDocs(collection(db, 'trips', tripId, 'itinerario')),
+      ]);
       const batch = writeBatch(db);
       items.forEach((d) => batch.delete(d.ref));
+      eventos.forEach((d) => batch.delete(d.ref));
       batch.delete(doc(db, 'trips', tripId));
       await batch.commit();
     },
@@ -104,6 +108,46 @@ export function createFirebaseStore(db) {
       const batch = writeBatch(db);
       cambios.forEach(({ id, orden }) => batch.update(doc(db, 'trips', tripId, 'items', id), { orden }));
       return batch.commit();
+    },
+
+    // Itinerario: un documento por actividad, con su dia (fecha) y orden dentro del dia
+    subscribeItinerario(tripId, onData, onError) {
+      return onSnapshot(
+        collection(db, 'trips', tripId, 'itinerario'),
+        (s) => onData(s.docs.map(conId)),
+        onError,
+      );
+    },
+
+    addEvento(tripId, evento) {
+      return setDoc(doc(collection(db, 'trips', tripId, 'itinerario')), {
+        ...evento,
+        creado: serverTimestamp(),
+      });
+    },
+
+    updateEvento(tripId, eventoId, patch) {
+      return updateDoc(doc(db, 'trips', tripId, 'itinerario', eventoId), patch);
+    },
+
+    deleteEvento(tripId, eventoId) {
+      return deleteDoc(doc(db, 'trips', tripId, 'itinerario', eventoId));
+    },
+
+    reorderEventos(tripId, cambios) {
+      const batch = writeBatch(db);
+      cambios.forEach(({ id, orden }) => batch.update(doc(db, 'trips', tripId, 'itinerario', id), { orden }));
+      return batch.commit();
+    },
+
+    // Perfil de la persona (datos minimos del registro)
+    async getProfile(uid) {
+      const s = await getDoc(doc(db, 'users', uid));
+      return s.exists() ? s.data() : null;
+    },
+
+    saveProfile(uid, perfil) {
+      return setDoc(doc(db, 'users', uid), { ...perfil, actualizado: serverTimestamp() }, { merge: true });
     },
 
     // Invitaciones por link con rol

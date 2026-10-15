@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
+  CalendarBlank,
   DotsThreeVertical,
   ListChecks,
   LockSimple,
@@ -18,8 +19,12 @@ import Nav from '../components/Nav.jsx';
 import { Cargando, Modal, ProgressRing, useToast } from '../components/ui.jsx';
 import { DESTINOS_POR_ID, foto } from '../data/destinos.js';
 import { verificadoPara } from '../data/requisitos.js';
-import { diasParaViaje, formatoCorto, formatoLargo } from '../lib/fechas.js';
-import { estaVencido, mensajeError, puedeEditar, resumenItems, ROLES } from '../lib/viajes.js';
+import { diasEntre, diasParaViaje, formatoCorto, formatoLargo } from '../lib/fechas.js';
+import { estaVencido, mensajeError, puedeEditar, resumenItems, ROLES, sincronizarPasajeros } from '../lib/viajes.js';
+import { pasajerosDe } from '../data/pasajeros.js';
+import { RangoFechas } from '../components/Calendario.jsx';
+import PasajerosEditor, { limpiarPasajeros, validarPasajeros } from '../components/Pasajeros.jsx';
+import Itinerario from './viaje/Itinerario.jsx';
 import Checklist from './viaje/Checklist.jsx';
 import Recomendados from './viaje/Recomendados.jsx';
 import Presupuesto from './viaje/Presupuesto.jsx';
@@ -27,40 +32,50 @@ import Grupo from './viaje/Grupo.jsx';
 
 const TABS = [
   { id: 'checklist', nombre: 'Checklist', Icono: ListChecks },
+  { id: 'itinerario', nombre: 'Itinerario', Icono: CalendarBlank },
   { id: 'recomendados', nombre: 'Recomendados', Icono: Sparkle },
   { id: 'presupuesto', nombre: 'Presupuesto', Icono: Wallet },
   { id: 'grupo', nombre: 'Grupo', Icono: Users },
 ];
 
-function EditarViaje({ trip, store, onClose }) {
+function EditarViaje({ trip, items, user, perfil, store, onClose }) {
   const toast = useToast();
   const [nombre, setNombre] = useState(trip.nombre);
-  const [ida, setIda] = useState(trip.fechaIda);
-  const [vuelta, setVuelta] = useState(trip.fechaVuelta);
-  const [viajeros, setViajeros] = useState(trip.viajeros);
+  const [fechas, setFechas] = useState({ desde: trip.fechaIda, hasta: trip.fechaVuelta });
+  const [pasajeros, setPasajeros] = useState(() => pasajerosDe(trip, user, perfil));
   const [errores, setErrores] = useState({});
   const [guardando, setGuardando] = useState(false);
 
   const guardar = async (ev) => {
     ev.preventDefault();
-    const e = {};
+    const e = { ...validarPasajeros(pasajeros) };
     if (!nombre.trim()) e.nombre = 'El viaje necesita un nombre.';
-    if (!ida) e.ida = 'Elegí la fecha de salida.';
-    if (!vuelta) e.vuelta = 'Elegí la fecha de regreso.';
-    else if (ida && vuelta <= ida) e.vuelta = 'El regreso tiene que ser después de la salida.';
-    if (!(viajeros >= 1 && viajeros <= 20)) e.viajeros = 'Entre 1 y 20 viajeros.';
+    if (!fechas.desde || !fechas.hasta) e.fechas = 'Elegí la salida y la vuelta.';
+    else if (diasEntre(fechas.desde, fechas.hasta) > 90) e.fechas = 'El viaje no puede superar los 90 días.';
     setErrores(e);
     if (Object.keys(e).length) return;
 
     setGuardando(true);
     try {
+      const lista = limpiarPasajeros(pasajeros);
       await store.updateTrip(trip.id, {
         nombre: nombre.trim().slice(0, 80),
-        fechaIda: ida,
-        fechaVuelta: vuelta,
-        viajeros: Number(viajeros),
+        fechaIda: fechas.desde,
+        fechaVuelta: fechas.hasta,
+        viajeros: lista.length,
+        pasajeros: lista,
       });
-      toast.ok('Viaje actualizado.');
+      // Ajusta los tramites por persona y suma requisitos nuevos (por ejemplo, si se agrego un menor)
+      const { cambios, nuevos } = sincronizarPasajeros(trip, items, lista);
+      await Promise.all([
+        ...cambios.map((c) => store.updateItem(trip.id, c.id, c.patch)),
+        ...nuevos.map((it) => store.addItem(trip.id, it)),
+      ]);
+      toast.ok(
+        nuevos.length
+          ? `Viaje actualizado. Sumamos ${nuevos.length} ${nuevos.length === 1 ? 'requisito' : 'requisitos'} por los pasajeros.`
+          : 'Viaje actualizado.',
+      );
       onClose();
     } catch (err) {
       toast.error(mensajeError(err));
@@ -70,36 +85,21 @@ function EditarViaje({ trip, store, onClose }) {
 
   return (
     <Modal titulo="Editar viaje" onClose={onClose}>
-      <form className="form-grid modal__form" onSubmit={guardar} noValidate>
-        <div className="field form-grid__wide">
+      <form className="modal__form edit-trip" onSubmit={guardar} noValidate>
+        <div className="field">
           <label htmlFor="e-nombre">Nombre</label>
           <input id="e-nombre" className="input" value={nombre} maxLength={80} onChange={(e) => setNombre(e.target.value)} />
           {errores.nombre && <span className="field__error">{errores.nombre}</span>}
         </div>
         <div className="field">
-          <label htmlFor="e-ida">Salida</label>
-          <input id="e-ida" type="date" className="input" value={ida} onChange={(e) => setIda(e.target.value)} />
-          {errores.ida && <span className="field__error">{errores.ida}</span>}
+          <span className="field__label">Fechas</span>
+          <RangoFechas desde={fechas.desde} hasta={fechas.hasta} onChange={setFechas} error={errores.fechas} />
         </div>
         <div className="field">
-          <label htmlFor="e-vuelta">Regreso</label>
-          <input id="e-vuelta" type="date" className="input" min={ida} value={vuelta} onChange={(e) => setVuelta(e.target.value)} />
-          {errores.vuelta && <span className="field__error">{errores.vuelta}</span>}
+          <span className="field__label">Pasajeros</span>
+          <PasajerosEditor pasajeros={pasajeros} onChange={setPasajeros} uidTitular={user.uid} errores={errores} />
         </div>
-        <div className="field form-grid__wide">
-          <label htmlFor="e-viajeros">Cantidad de viajeros</label>
-          <input
-            id="e-viajeros"
-            type="number"
-            min="1"
-            max="20"
-            className="input"
-            value={viajeros}
-            onChange={(e) => setViajeros(e.target.value)}
-          />
-          {errores.viajeros && <span className="field__error">{errores.viajeros}</span>}
-        </div>
-        <div className="form-grid__wide modal__foot">
+        <div className="modal__foot">
           <button type="button" className="btn btn--ghost" onClick={onClose}>
             Cancelar
           </button>
@@ -221,7 +221,7 @@ function Mensaje({ icono, titulo, texto }) {
 
 export default function Viaje() {
   const { id } = useParams();
-  const { user, store } = useAuth();
+  const { user, perfil, store } = useAuth();
   const [params, setParams] = useSearchParams();
   const [editando, setEditando] = useState(false);
   const [eliminando, setEliminando] = useState(false);
@@ -365,6 +365,7 @@ export default function Viaje() {
 
           <div className="trip-body">
             {tab === 'checklist' && <Checklist trip={trip} items={items} editable={editable} store={store} nota={nota} />}
+            {tab === 'itinerario' && <Itinerario trip={trip} editable={editable} store={store} />}
             {tab === 'recomendados' && <Recomendados trip={trip} items={items} editable={editable} store={store} />}
             {tab === 'presupuesto' && <Presupuesto trip={trip} items={items} />}
             {tab === 'grupo' && <Grupo trip={trip} user={user} store={store} />}
@@ -372,7 +373,9 @@ export default function Viaje() {
         </main>
       </div>
 
-      {editando && <EditarViaje trip={trip} store={store} onClose={() => setEditando(false)} />}
+      {editando && (
+        <EditarViaje trip={trip} items={items} user={user} perfil={perfil} store={store} onClose={() => setEditando(false)} />
+      )}
       {eliminando && <EliminarViaje trip={trip} store={store} onClose={() => setEliminando(false)} />}
     </>
   );

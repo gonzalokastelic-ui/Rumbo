@@ -1598,3 +1598,260 @@
   gap: 8px;
   margin-top: 6px;
 }
+
+/* ---------- Perfil ---------- */
+.fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.fecha3 {
+  display: grid;
+  grid-template-columns: 0.8fr 1.4fr 1fr;
+  gap: 8px;
+}
+
+.nav__avatar {
+  border-radius: 50%;
+}
+
+/* ---------- Pasajeros ---------- */
+.pax {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.pax__cols,
+.pax__row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 40px;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
+.pax__cols {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.pax__list {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.pax__n {
+  font-size: 0.85rem;
+  color: var(--text-3);
+  text-align: center;
+}
+
+.pax__name {
+  position: relative;
+  display: grid;
+  gap: 4px;
+}
+
+.pax__you {
+  position: absolute;
+  right: 12px;
+  top: 14px;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--accent-text);
+}
+
+@media (max-width: 640px) {
+  .pax__cols {
+    display: none;
+  }
+
+  .pax__row {
+    grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1fr) 40px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .pax__name {
+    grid-column: 2 / 4;
+  }
+
+  .pax__row > .icon-btn {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
+  .pax__row > select:nth-of-type(1) {
+    grid-column: 2;
+  }
+
+  .pax__row > select:nth-of-type(2) {
+    grid-column: 3;
+  }
+}
+
+.pax-checks {
+  display: grid;
+  gap: 2px;
+}
+
+.pax-check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.pax-check:hover {
+  background: var(--glass);
+}
+
+.pax-check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--red);
+}
+
+/* ---------- Asistente y edicion de viaje ---------- */
+.wizard__lead {
+  margin: -10px 0 18px;
+  max-width: 62ch;
+}
+
+.wizard__name {
+  margin-top: 22px;
+}
+
+.wizard__extras {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.wizard__extras ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.modal:has(.edit-trip) {
+  width: min(100%, 760px);
+}
+
+.edit-trip {
+  display: grid;
+  gap: 22px;
+}
+
+.drawer__cal {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 8px;
+  border-radius: var(--r-md);
+  background: var(--field);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.drawer__date {
+  color: var(--text);
+  font-weight: 550;
+}
+
+.drawer__agenda {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- Itinerario ---------- */
+.itin {
+  display: grid;
+  gap: 30px;
+}
+
+.itin__lead {
+  max-width: 62ch;
+  font-size: 0.92rem;
+}
+
+.dia {
+  display: grid;
+  gap: 4px;
+}
+
+.dia__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dia__head h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 1.05rem;
+}
+
+.dia__fecha {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.dia .rows .row:first-child {
+  border-top: 0;
+}
+
+.dia__vacio {
+  padding: 12px 4px;
+  font-size: 0.88rem;
+}
+
+.dia__add {
+  justify-self: start;
+}
+
+.ev__hora {
+  flex: none;
+  width: 62px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-text);
+}
+
+.ev__hora.is-empty {
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--text-3);
+}
+
+.ev-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+@media (max-width: 640px) {
+  .ev-add {
+    grid-template-columns: minmax(0, 1fr) 120px;
+  }
+}
+
+@media (max-width: 720px) {
+  .tv-tabs button {
+    font-size: 0.66rem;
+    padding: 8px 2px;
+  }
+}

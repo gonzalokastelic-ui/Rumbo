@@ -10,11 +10,12 @@ const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const NuevoViaje = lazy(() => import('./pages/NuevoViaje.jsx'));
 const Viaje = lazy(() => import('./pages/Viaje.jsx'));
 const Unirse = lazy(() => import('./pages/Unirse.jsx'));
+const Perfil = lazy(() => import('./pages/Perfil.jsx'));
 
 function Privada({ children }) {
-  const { listo, user } = useAuth();
+  const { listo, user, perfil, perfilListo } = useAuth();
   const location = useLocation();
-  if (!listo) {
+  if (!listo || (user && !perfilListo)) {
     return (
       <div className="auth-wait">
         <Cargando texto="Preparando tu sesión" />
@@ -22,6 +23,10 @@ function Privada({ children }) {
     );
   }
   if (!user) return <Navigate to="/ingresar" replace state={{ from: location.pathname + location.search }} />;
+  // La primera vez se piden los datos minimos del perfil
+  if (!perfil && location.pathname !== '/perfil') {
+    return <Navigate to="/perfil" replace state={{ from: location.pathname + location.search }} />;
+  }
   return children;
 }
 
@@ -56,6 +61,7 @@ export default function App() {
             <Route path="/viajes/nuevo" element={<Privada><NuevoViaje /></Privada>} />
             <Route path="/viaje/:id" element={<Privada><Viaje /></Privada>} />
             <Route path="/unirse/:token" element={<Privada><Unirse /></Privada>} />
+            <Route path="/perfil" element={<Privada><Perfil /></Privada>} />
             <Route path="*" element={<NoEncontrada />} />
           </Routes>
         </Suspense>

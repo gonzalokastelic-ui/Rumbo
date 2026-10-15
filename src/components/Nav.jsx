@@ -47,9 +47,9 @@ export default function Nav({ landing = false }) {
                 <button type="button" className="icon-btn" onClick={salir} aria-label="Cerrar sesión" title="Cerrar sesión">
                   <SignOut size={20} />
                 </button>
-                <span className="nav__hide-sm">
+                <Link to="/perfil" className="nav__hide-sm nav__avatar" aria-label="Mi perfil" title="Mi perfil">
                   <Avatar nombre={user.displayName} foto={user.photoURL} rojo />
-                </span>
+                </Link>
               </>
             ) : (
               <Link to="/ingresar" className="btn btn--primary btn--sm">

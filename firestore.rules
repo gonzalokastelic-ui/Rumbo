@@ -22,7 +22,20 @@ service cloud.firestore {
     function validTrip(d) {
       return d.nombre is string && d.nombre.size() > 0 && d.nombre.size() <= 80
         && d.destinoId is string
-        && d.viajeros is int && d.viajeros >= 1 && d.viajeros <= 20;
+        && d.viajeros is int && d.viajeros >= 1 && d.viajeros <= 20
+        && (!('pasajeros' in d) || (d.pasajeros is list && d.pasajeros.size() <= 20));
+    }
+
+    function validEvento(d) {
+      return d.titulo is string && d.titulo.size() > 0 && d.titulo.size() <= 120
+        && d.fecha is string && d.fecha.size() == 10
+        && (d.hora == null || (d.hora is string && d.hora.size() == 5));
+    }
+
+    function validPerfil(d) {
+      return d.nombre is string && d.nombre.size() >= 2 && d.nombre.size() <= 80
+        && d.nacimiento is string && d.nacimiento.size() == 10
+        && d.nacionalidad is string && d.nacionalidad.size() <= 40;
     }
 
     function validItem(d) {
@@ -88,6 +101,21 @@ service cloud.firestore {
           && validItem(request.resource.data);
         allow delete: if signedIn() && roleIn(tripId) in ['owner', 'editor'];
       }
+
+      // Itinerario: todos los miembros lo ven; organizador y editores lo arman
+      match /itinerario/{eventoId} {
+        allow read: if signedIn() && roleIn(tripId) in ['owner', 'editor', 'viewer'];
+        allow create, update: if signedIn() && roleIn(tripId) in ['owner', 'editor']
+          && validEvento(request.resource.data);
+        allow delete: if signedIn() && roleIn(tripId) in ['owner', 'editor'];
+      }
+    }
+
+    // Perfil: cada persona lee y escribe solo el suyo
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid && validPerfil(request.resource.data);
+      allow delete: if false;
     }
 
     // El token es largo e impredecible: se permite `get` pero no listar todos.

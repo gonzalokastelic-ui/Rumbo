@@ -1,13 +1,32 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { LinkSimple, Trash, X } from '@phosphor-icons/react';
+import { CalendarPlus, LinkSimple, Trash, X } from '@phosphor-icons/react';
 import { CATEGORIAS_POR_ID, ESTADOS } from '../../data/requisitos.js';
+import { estadoDesdePersonas } from '../../lib/viajes.js';
+import { formatoLargo } from '../../lib/fechas.js';
+import { FechaUnica } from '../../components/Calendario.jsx';
 
 // Detalle de un item: panel lateral en escritorio y hoja inferior en celular.
 // Cada campo guarda al salir del input, asi la persona no tiene que "confirmar".
-export default function ItemDrawer({ item, editable, miembros, onPatch, onDelete, onClose }) {
+export default function ItemDrawer({ item, editable, miembros, pasajeros = [], dias = [], onAgendar, onPatch, onDelete, onClose }) {
   const cerrar = useRef(null);
   const tituloRef = useRef(null);
   const [eligiendoFecha, setEligiendoFecha] = useState(false);
+  const [diaAgenda, setDiaAgenda] = useState(dias[0]?.fecha || '');
+
+  const personas = item.porPersona && item.personas ? Object.keys(item.personas) : [];
+  const nombreDe = (id) => pasajeros.find((p) => p.id === id)?.nombre || 'Pasajero';
+
+  // En los tramites por persona, el estado general sale de cuantas personas lo resolvieron
+  const cambiarEstado = (estado) => {
+    if (!personas.length || estado === 'tramite') return onPatch(item, { estado });
+    const todas = Object.fromEntries(personas.map((id) => [id, estado === 'listo']));
+    return onPatch(item, { estado, personas: todas });
+  };
+
+  const marcarPersona = (id, hecho) => {
+    const nuevas = { ...item.personas, [id]: hecho };
+    onPatch(item, { personas: nuevas, estado: estadoDesdePersonas(nuevas) });
+  };
 
   // El titulo es un textarea que crece con su contenido (field-sizing no esta en todos los navegadores)
   const ajustar = (el) => {
@@ -87,7 +106,7 @@ export default function ItemDrawer({ item, editable, miembros, onPatch, onDelete
                   aria-checked={item.estado === e.id}
                   className={item.estado === e.id ? 'is-on' : ''}
                   disabled={!editable}
-                  onClick={() => onPatch(item, { estado: e.id })}
+                  onClick={() => cambiarEstado(e.id)}
                 >
                   {e.nombre}
                 </button>
@@ -95,33 +114,56 @@ export default function ItemDrawer({ item, editable, miembros, onPatch, onDelete
             </div>
           </div>
 
+          {personas.length > 0 && (
+            <div className="field">
+              <span className="field__label">
+                Por pasajero ({personas.filter((id) => item.personas[id]).length} de {personas.length})
+              </span>
+              <ul className="pax-checks">
+                {personas.map((id) => (
+                  <li key={id}>
+                    <label className="pax-check">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(item.personas[id])}
+                        disabled={!editable}
+                        onChange={(e) => marcarPersona(id, e.target.checked)}
+                      />
+                      <span>{nombreDe(id)}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="field">
             <label htmlFor="d-lim">Fecha límite</label>
-            {item.fechaLimite || eligiendoFecha ? (
-              <div className="field__row">
-                <input
-                  key={`l-${item.fechaLimite || 'none'}`}
-                  id="d-lim"
-                  type="date"
-                  className="input"
-                  autoFocus={eligiendoFecha && !item.fechaLimite}
-                  defaultValue={item.fechaLimite || ''}
-                  disabled={!editable}
-                  onChange={(e) => {
-                    if (e.target.value && e.target.value !== item.fechaLimite) onPatch(item, { fechaLimite: e.target.value });
+            {eligiendoFecha && editable ? (
+              <div className="drawer__cal">
+                <FechaUnica
+                  valor={item.fechaLimite}
+                  onChange={(iso) => {
+                    onPatch(item, { fechaLimite: iso });
+                    setEligiendoFecha(false);
                   }}
                 />
+                <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEligiendoFecha(false)}>
+                  Cancelar
+                </button>
+              </div>
+            ) : item.fechaLimite ? (
+              <div className="field__row">
+                <span className="drawer__none drawer__date">{formatoLargo(item.fechaLimite)}</span>
                 {editable && (
-                  <button
-                    type="button"
-                    className="btn btn--ghost btn--sm"
-                    onClick={() => {
-                      setEligiendoFecha(false);
-                      if (item.fechaLimite) onPatch(item, { fechaLimite: null });
-                    }}
-                  >
-                    Quitar
-                  </button>
+                  <>
+                    <button type="button" id="d-lim" className="btn btn--glass btn--sm" onClick={() => setEligiendoFecha(true)}>
+                      Cambiar
+                    </button>
+                    <button type="button" className="btn btn--ghost btn--sm" onClick={() => onPatch(item, { fechaLimite: null })}>
+                      Quitar
+                    </button>
+                  </>
                 )}
               </div>
             ) : (
@@ -196,6 +238,24 @@ export default function ItemDrawer({ item, editable, miembros, onPatch, onDelete
             />
           </div>
         </div>
+
+        {editable && onAgendar && dias.length > 0 && (
+          <div className="field drawer__agenda">
+            <label htmlFor="d-dia">Agendar en el itinerario</label>
+            <div className="field__row">
+              <select id="d-dia" className="select" value={diaAgenda} onChange={(e) => setDiaAgenda(e.target.value)}>
+                {dias.map((d) => (
+                  <option key={d.fecha} value={d.fecha}>
+                    {d.etiqueta}
+                  </option>
+                ))}
+              </select>
+              <button type="button" className="btn btn--glass btn--sm" onClick={() => onAgendar(item, diaAgenda)}>
+                <CalendarPlus size={16} /> Agendar
+              </button>
+            </div>
+          </div>
+        )}
 
         <footer className="drawer__foot">
           {item.link && (

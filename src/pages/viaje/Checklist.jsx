@@ -32,7 +32,7 @@ import {
   Wallet,
 } from '@phosphor-icons/react';
 import { CATEGORIAS, CATEGORIAS_POR_ID } from '../../data/requisitos.js';
-import { formatoCorto, urgencia } from '../../lib/fechas.js';
+import { diasDelViaje, formatoCorto, urgencia } from '../../lib/fechas.js';
 import { mensajeError, ordenarItems, estaVencido } from '../../lib/viajes.js';
 import { useToast } from '../../components/ui.jsx';
 import ItemDrawer from './ItemDrawer.jsx';
@@ -59,6 +59,8 @@ function Fila({ item, trip, editable, onPatch, onAbrir }) {
   const style = { transform: CSS.Transform.toString(transform), transition };
 
   const vencido = estaVencido(item);
+  const personas = item.porPersona && item.personas ? Object.values(item.personas) : [];
+  const hechos = personas.filter(Boolean).length;
   const urgente = !vencido && item.estado !== 'listo' && urgencia(item.fechaLimite) === 'urgente';
   const asignado = item.asignadoA ? trip.miembrosInfo?.[item.asignadoA] : null;
 
@@ -84,7 +86,15 @@ function Fila({ item, trip, editable, onPatch, onAbrir }) {
       <button
         type="button"
         className={`check check--${item.estado}`}
-        onClick={() => editable && onPatch(item, { estado: item.estado === 'listo' ? 'pendiente' : 'listo' })}
+        onClick={() => {
+          if (!editable) return;
+          const estado = item.estado === 'listo' ? 'pendiente' : 'listo';
+          const cambios = { estado };
+          if (item.porPersona && item.personas) {
+            cambios.personas = Object.fromEntries(Object.keys(item.personas).map((id) => [id, estado === 'listo']));
+          }
+          onPatch(item, cambios);
+        }}
         disabled={!editable}
         aria-label={item.estado === 'listo' ? `Marcar "${item.titulo}" como pendiente` : `Marcar "${item.titulo}" como listo`}
         aria-pressed={item.estado === 'listo'}
@@ -96,7 +106,7 @@ function Fila({ item, trip, editable, onPatch, onAbrir }) {
       <button type="button" className="row__main" onClick={() => onAbrir(item.id)} aria-label={`Abrir detalle de ${item.titulo}`}>
         <span className="row__text">
           <span className="row__title">{item.titulo}</span>
-          {(item.fechaLimite || item.estado === 'tramite' || asignado || item.costo > 0) && (
+          {(item.fechaLimite || item.estado === 'tramite' || asignado || item.costo > 0 || personas.length > 1) && (
             <span className="row__sub">
               {item.fechaLimite && item.estado !== 'listo' && (
                 <span className={vencido || urgente ? 'is-alert' : ''}>
@@ -105,6 +115,11 @@ function Fila({ item, trip, editable, onPatch, onAbrir }) {
                 </span>
               )}
               {item.estado === 'tramite' && <span className="is-accent">En trámite</span>}
+              {personas.length > 1 && item.estado !== 'listo' && (
+                <span className="mono">
+                  {hechos}/{personas.length} pasajeros
+                </span>
+              )}
               {asignado && <span>{asignado.nombre.split(' ')[0]}</span>}
               {item.costo > 0 && <span className="mono">USD {item.costo}</span>}
             </span>
@@ -177,6 +192,25 @@ export default function Checklist({ trip, items, editable, store, nota }) {
   const [agregando, setAgregando] = useState(false);
 
   const miembros = useMemo(() => Object.entries(trip.miembrosInfo || {}), [trip.miembrosInfo]);
+  const dias = useMemo(() => diasDelViaje(trip.fechaIda, trip.fechaVuelta), [trip.fechaIda, trip.fechaVuelta]);
+
+  const agendar = async (item, fecha) => {
+    try {
+      await store.addEvento(trip.id, {
+        fecha,
+        hora: null,
+        titulo: item.titulo,
+        lugar: '',
+        notas: '',
+        itemId: item.id,
+        orden: Date.now(),
+      });
+      const dia = dias.find((d) => d.fecha === fecha);
+      toast.ok(`Agendado para el ${dia ? dia.etiqueta.toLowerCase() : fecha}.`);
+    } catch (e) {
+      toast.error(mensajeError(e));
+    }
+  };
   const abierto = abiertoId ? items.find((i) => i.id === abiertoId) : null;
 
   const secciones = useMemo(() => {
@@ -325,6 +359,9 @@ export default function Checklist({ trip, items, editable, store, nota }) {
           item={abierto}
           editable={editable}
           miembros={miembros}
+          pasajeros={trip.pasajeros || []}
+          dias={dias}
+          onAgendar={agendar}
           onPatch={patch}
           onDelete={borrar}
           onClose={() => setAbiertoId(null)}

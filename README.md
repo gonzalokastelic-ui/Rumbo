@@ -12,8 +12,10 @@ Rumbo **no vende** pasajes ni alojamiento: organiza y recomienda.
 
 - **Landing scrollweb** con escenario fotográfico fijo, vidrio esmerilado (glassmorphism) y animaciones atadas al scroll (GSAP ScrollTrigger).
 - **Checklist automático** para 8 destinos desde Argentina: Brasil, Chile, España, Estados Unidos, Italia, Uruguay, México y Aruba.
-- **Estados por ítem** (pendiente, en trámite, listo), fecha límite, costo, responsable, notas y link.
-- **Fechas límite** recalculadas si cambia la salida; avisos de ítems vencidos o urgentes.
+- **Requisitos según los pasajeros**: menores, bebés, mayores de 65 y otras nacionalidades suman sus trámites. Los trámites personales (pasaporte, visa, seguro) se tildan por pasajero dentro de cada ítem.
+- **Estados por ítem** (pendiente, en trámite, listo), fecha límite opcional, costo, responsable, notas y link. Se reordenan arrastrando.
+- **Itinerario por día**: actividades con hora y lugar para cada día del viaje; los ítems del checklist se pueden agendar.
+- **Perfil mínimo** al registrarse: nombre, fecha de nacimiento y nacionalidad.
 - **Presupuesto** total, por persona y por categoría.
 - **Recomendados**: calendario de precios de vuelos, aerolíneas directas, hoteles y actividades, con links a SlickTrip y Brek ya cargados con tus fechas.
 - **Grupos y roles**: invitás por link, elegís editor o solo lectura, cambiás el rol o cerrás el link cuando quieras.
@@ -63,14 +65,22 @@ Reiniciá `npm run dev` después de cambiar `.env`.
 ### Modelo de datos
 
 ```
+users/{uid}
+  nombre, nacimiento, nacionalidad
+
 trips/{tripId}
   nombre, destinoId, origen, fechaIda, fechaVuelta, viajeros, plantilla
+  pasajeros [{ id, nombre, edad ('adulto' | 'menor' | 'bebe' | 'mayor'), nacionalidad }]
   ownerId, miembros { uid: 'owner' | 'editor' | 'viewer' }, miembrosUids [uid], miembrosInfo { uid: {nombre, foto} }
   resumen { total, listos, tramite }
 
 trips/{tripId}/items/{itemId}
-  titulo, categoria, estado ('pendiente' | 'tramite' | 'listo'), fechaLimite, diasAntes
+  titulo, categoria, estado ('pendiente' | 'tramite' | 'listo'), fechaLimite
   costo, notas, link, asignadoA, predeterminado, clave, desc, orden
+  porPersona, personas { pasajeroId: true | false }
+
+trips/{tripId}/itinerario/{eventoId}
+  fecha, hora, titulo, lugar, notas, itemId, orden
 
 invites/{token}
   tripId, rol ('editor' | 'viewer'), ownerId, activo

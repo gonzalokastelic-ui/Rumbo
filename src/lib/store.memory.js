@@ -8,6 +8,8 @@ export function createMemoryStore() {
   const trips = new Map();
   const items = new Map(); // tripId -> Map(itemId, item)
   const invites = new Map();
+  const eventos = new Map(); // tripId -> Map(eventoId, evento)
+  const perfiles = new Map();
   const listeners = new Set();
 
   const emit = () => listeners.forEach((fn) => fn());
@@ -53,7 +55,7 @@ export function createMemoryStore() {
       const m = tripItems(id);
       lista.forEach((it, i) => {
         const itemId = uid();
-        m.set(itemId, { id: itemId, ...it, orden: i });
+        m.set(itemId, { id: itemId, ...it, orden: it.orden ?? i * 10 });
       });
       emit();
       return id;
@@ -67,6 +69,7 @@ export function createMemoryStore() {
     async deleteTrip(tripId) {
       trips.delete(tripId);
       items.delete(tripId);
+      eventos.delete(tripId);
       emit();
     },
 
@@ -91,6 +94,43 @@ export function createMemoryStore() {
     async deleteItem(tripId, itemId) {
       tripItems(tripId).delete(itemId);
       emit();
+    },
+
+    subscribeItinerario(tripId, onData) {
+      if (!eventos.has(tripId)) eventos.set(tripId, new Map());
+      return listen(() => [...eventos.get(tripId).values()].map((e) => ({ ...e })), onData);
+    },
+
+    async addEvento(tripId, evento) {
+      if (!eventos.has(tripId)) eventos.set(tripId, new Map());
+      const id = uid();
+      eventos.get(tripId).set(id, { id, ...evento });
+      emit();
+    },
+
+    async updateEvento(tripId, eventoId, patch) {
+      const m = eventos.get(tripId);
+      m.set(eventoId, { ...m.get(eventoId), ...patch });
+      emit();
+    },
+
+    async deleteEvento(tripId, eventoId) {
+      eventos.get(tripId)?.delete(eventoId);
+      emit();
+    },
+
+    async reorderEventos(tripId, cambios) {
+      const m = eventos.get(tripId);
+      cambios.forEach(({ id, orden }) => m.set(id, { ...m.get(id), orden }));
+      emit();
+    },
+
+    async getProfile(userId) {
+      return perfiles.get(userId) || null;
+    },
+
+    async saveProfile(userId, perfil) {
+      perfiles.set(userId, { ...perfiles.get(userId), ...perfil });
     },
 
     async createInvite(user, tripId, rol) {

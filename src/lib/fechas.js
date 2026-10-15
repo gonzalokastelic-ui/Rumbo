@@ -55,3 +55,21 @@ export function diasParaViaje(fechaIda) {
   if (!fechaIda) return null;
   return diasEntre(hoyISO(), fechaIda);
 }
+
+const DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+
+export function formatoDia(iso) {
+  const d = parseISO(iso);
+  if (!d) return '';
+  return `${DIAS_SEMANA[d.getDay()]} ${d.getDate()} ${MESES[d.getMonth()]}`;
+}
+
+// Todos los dias del viaje, de la salida a la vuelta inclusive
+export function diasDelViaje(desde, hasta) {
+  if (!desde || !hasta || hasta < desde) return [];
+  const total = diasEntre(desde, hasta);
+  return Array.from({ length: Math.min(total, 90) + 1 }, (_, i) => {
+    const fecha = sumarDias(desde, i);
+    return { fecha, n: i + 1, etiqueta: `Día ${i + 1}, ${formatoDia(fecha)}` };
+  });
+}
