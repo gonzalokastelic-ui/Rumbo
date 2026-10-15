@@ -27,6 +27,7 @@ export const PLANTILLAS = [
   { id: 'escapada', nombre: 'Escapada corta', desc: 'Fin de semana largo, equipaje de mano.' },
   { id: 'mochilero', nombre: 'Mochilero', desc: 'Presupuesto ajustado y reservas flexibles.' },
   { id: 'trabajo', nombre: 'Trabajo o estudio', desc: 'Documentos y conectividad para rendir.' },
+  { id: 'personalizado', nombre: 'Personalizado', desc: 'Lista vacía: cargás vos cada requisito.' },
 ];
 
 const base = [
@@ -346,6 +347,8 @@ const porPasajeros = [
 const POR_PERSONA = new Set(['documento', 'visa', 'ds160', 'etias', 'fmm', 'ingreso', 'seguro', 'seguro-extendido']);
 
 export function requisitosPara(destinoId, plantillaId = 'vacaciones', pasajeros = []) {
+  // Personalizado: la lista arranca vacia y la persona carga sus propios requisitos
+  if (plantillaId === 'personalizado') return [];
   const d = porDestino[destinoId];
   const extras = porPlantilla[plantillaId] || [];
   const generales = [...(d ? d.items : []), ...base, ...extras].map((it) => ({

@@ -193,6 +193,10 @@ export default function NuevoViaje() {
             {paso === 3 && (
               <>
                 <h2 className="wizard__h">¿Qué tipo de viaje es?</h2>
+                <p className="muted wizard__lead">
+                  Cada tipo trae por defecto los requisitos básicos del destino y los de tus pasajeros, más algunos propios
+                  del tipo de viaje. Si preferís armar la lista desde cero, elegí Personalizado.
+                </p>
                 <div className="tpl-grid" role="radiogroup" aria-label="Tipo de viaje">
                   {PLANTILLAS.map((p) => (
                     <button
@@ -208,11 +212,17 @@ export default function NuevoViaje() {
                     </button>
                   ))}
                 </div>
-                <p className="wizard__sum">
-                  Vamos a crear <strong className="mono">{requisitos.length}</strong> ítems para{' '}
-                  <strong>{destino.nombre}</strong> y <strong className="mono">{pasajeros.length}</strong>{' '}
-                  {pasajeros.length === 1 ? 'pasajero' : 'pasajeros'}. Después los editás a tu gusto.
-                </p>
+                {plantilla === 'personalizado' ? (
+                  <p className="wizard__sum">
+                    Tu checklist arranca <strong>vacío</strong>: agregás vos cada requisito desde la pantalla del viaje.
+                  </p>
+                ) : (
+                  <p className="wizard__sum">
+                    Vamos a crear <strong className="mono">{requisitos.length}</strong> ítems para{' '}
+                    <strong>{destino.nombre}</strong> y <strong className="mono">{pasajeros.length}</strong>{' '}
+                    {pasajeros.length === 1 ? 'pasajero' : 'pasajeros'}. Después los editás a tu gusto.
+                  </p>
+                )}
                 {extrasPasajeros.length > 0 && (
                   <div className="wizard__extras">
                     <p className="field__label">Según quiénes viajan, sumamos:</p>

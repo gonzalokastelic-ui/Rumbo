@@ -332,8 +332,24 @@ export default function Checklist({ trip, items, editable, store, nota }) {
         </form>
       )}
 
-      {secciones.length === 0 && (
-        <p className="muted cl-empty">No hay ítems en este filtro. Probá con otro o agregá algo nuevo.</p>
+      {items.length === 0 ? (
+        <div className="cl-start">
+          <h3>Tu lista está vacía</h3>
+          <p className="muted">
+            {editable
+              ? 'Cargá tus propios requisitos con Agregar: documentos, reservas o lo que necesites resolver antes de viajar.'
+              : 'Quien organiza el viaje todavía no cargó requisitos.'}
+          </p>
+          {editable && !agregarAbierto && (
+            <button type="button" className="btn btn--primary btn--sm" onClick={() => setAgregarAbierto(true)}>
+              <Plus size={16} weight="bold" /> Agregar el primero
+            </button>
+          )}
+        </div>
+      ) : (
+        secciones.length === 0 && (
+          <p className="muted cl-empty">No hay ítems en este filtro. Probá con otro o agregá algo nuevo.</p>
+        )
       )}
 
       <div className="secs">

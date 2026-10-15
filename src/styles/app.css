@@ -2034,3 +2034,35 @@ button.tcal__cell:hover {
     padding: 12px;
   }
 }
+
+/* ---------- Contraseña visible ---------- */
+.pass {
+  position: relative;
+}
+
+.pass .input {
+  padding-right: 52px;
+}
+
+.pass__toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+}
+
+.pass__toggle:active {
+  transform: translateY(-50%) scale(0.92);
+}
+
+/* ---------- Checklist vacio (tipo Personalizado) ---------- */
+.cl-start {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 28px 4px;
+}
+
+.cl-start p {
+  max-width: 52ch;
+}

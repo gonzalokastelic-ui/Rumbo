@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { GoogleLogo, Info } from '@phosphor-icons/react';
+import { Eye, EyeSlash, GoogleLogo, Info } from '@phosphor-icons/react';
 import { mensajeAuth, useAuth } from '../context/AuthContext.jsx';
 import Nav from '../components/Nav.jsx';
 import { Cargando } from '../components/ui.jsx';
@@ -14,6 +14,7 @@ export default function Login() {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [verPassword, setVerPassword] = useState(false);
   const [errores, setErrores] = useState({});
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -129,15 +130,27 @@ export default function Login() {
                   </div>
                   <div className="field">
                     <label htmlFor="password">Contraseña</label>
-                    <input
-                      id="password"
-                      type="password"
-                      className="input"
-                      autoComplete={modo === 'crear' ? 'new-password' : 'current-password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      aria-invalid={Boolean(errores.password)}
-                    />
+                    <div className="pass">
+                      <input
+                        id="password"
+                        type={verPassword ? 'text' : 'password'}
+                        className="input"
+                        autoComplete={modo === 'crear' ? 'new-password' : 'current-password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        aria-invalid={Boolean(errores.password)}
+                      />
+                      <button
+                        type="button"
+                        className="icon-btn pass__toggle"
+                        onClick={() => setVerPassword((v) => !v)}
+                        aria-label={verPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                        aria-pressed={verPassword}
+                        aria-controls="password"
+                      >
+                        {verPassword ? <EyeSlash size={20} /> : <Eye size={20} />}
+                      </button>
+                    </div>
                     {errores.password && <span className="field__error">{errores.password}</span>}
                   </div>
 
