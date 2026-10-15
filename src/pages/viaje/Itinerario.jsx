@@ -18,11 +18,97 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { CaretRight, Clock, DotsSixVertical, MapPin, Plus, SortAscending, Trash, X } from '@phosphor-icons/react';
 import { useSub } from '../../lib/useSub.js';
-import { diasDelViaje, formatoDia } from '../../lib/fechas.js';
+import { diasDelViaje, formatoDia, hoyISO, parseISO, sumarDias } from '../../lib/fechas.js';
 import { mensajeError } from '../../lib/viajes.js';
 import { Cargando, useToast } from '../../components/ui.jsx';
 
 const porOrden = (a, b) => (a.orden ?? 0) - (b.orden ?? 0);
+
+const SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+const lunesDe = (iso) => sumarDias(iso, -((parseISO(iso).getDay() + 6) % 7));
+const domingoDe = (iso) => sumarDias(iso, (7 - parseISO(iso).getDay()) % 7);
+
+function tituloMeses(desde, hasta) {
+  const a = parseISO(desde);
+  const b = parseISO(hasta);
+  if (a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()) return `${MESES_LARGO[a.getMonth()]} ${a.getFullYear()}`;
+  if (a.getFullYear() === b.getFullYear()) return `${MESES_LARGO[a.getMonth()]} y ${MESES_LARGO[b.getMonth()]} ${b.getFullYear()}`;
+  return `${MESES_LARGO[a.getMonth()]} ${a.getFullYear()} y ${MESES_LARGO[b.getMonth()]} ${b.getFullYear()}`;
+}
+
+// Calendario del viaje: semanas de lunes a domingo; los dias fuera del viaje quedan apagados
+function CalendarioViaje({ dias, porDia, seleccion, onSeleccionar }) {
+  const enViaje = new Map(dias.map((d) => [d.fecha, d]));
+  const inicio = lunesDe(dias[0].fecha);
+  const fin = domingoDe(dias[dias.length - 1].fecha);
+  const celdas = [];
+  for (let f = inicio; f <= fin; f = sumarDias(f, 1)) celdas.push(f);
+  const hoy = hoyISO();
+
+  return (
+    <div className="tcal">
+      <p className="tcal__title">{tituloMeses(dias[0].fecha, dias[dias.length - 1].fecha)}</p>
+      <div className="tcal__head" aria-hidden="true">
+        {SEMANA.map((d) => (
+          <span key={d}>{d}</span>
+        ))}
+      </div>
+      <div className="tcal__grid">
+        {celdas.map((f) => {
+          const d = enViaje.get(f);
+          const fecha = parseISO(f);
+          const numero = (
+            <span className="tcal__num">
+              {fecha.getDate()}
+              {(fecha.getDate() === 1 || f === inicio) && <small> {MESES[fecha.getMonth()]}</small>}
+            </span>
+          );
+          if (!d) {
+            return (
+              <div key={f} className="tcal__cell is-out" aria-hidden="true">
+                {numero}
+              </div>
+            );
+          }
+          const evs = porDia.get(f) || [];
+          return (
+            <button
+              key={f}
+              type="button"
+              className={`tcal__cell ${seleccion === f ? 'is-sel' : ''} ${f === hoy ? 'is-today' : ''}`}
+              aria-pressed={seleccion === f}
+              aria-label={`${d.etiqueta}: ${evs.length === 1 ? '1 actividad' : `${evs.length} actividades`}`}
+              onClick={() => onSeleccionar(f)}
+            >
+              <span className="tcal__top">
+                {numero}
+                <span className="tcal__dia">Día {d.n}</span>
+              </span>
+              <span className="tcal__evs">
+                {evs.slice(0, 3).map((e) => (
+                  <span key={e.id} className="tcal__ev">
+                    {e.hora && <b className="mono">{e.hora}</b>} {e.titulo}
+                  </span>
+                ))}
+                {evs.length > 3 && <span className="tcal__more">+{evs.length - 3} más</span>}
+              </span>
+              {evs.length > 0 && (
+                <span className="tcal__dots" aria-hidden="true">
+                  {evs.slice(0, 4).map((e) => (
+                    <i key={e.id} />
+                  ))}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function Evento({ evento, editable, onAbrir }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
@@ -327,6 +413,16 @@ export default function Itinerario({ trip, editable, store }) {
 
   const abierto = abiertoId ? (eventos || []).find((e) => e.id === abiertoId) : null;
 
+  // Dia elegido en el calendario: hoy si cae dentro del viaje, si no el primer dia
+  const [elegido, setElegido] = useState(null);
+  const hoy = hoyISO();
+  const seleccion = dias.some((d) => d.fecha === elegido)
+    ? elegido
+    : dias.some((d) => d.fecha === hoy)
+      ? hoy
+      : dias[0]?.fecha;
+  const diaSel = dias.find((d) => d.fecha === seleccion);
+
   const seguro = (fn) => async (...args) => {
     try {
       await fn(...args);
@@ -358,20 +454,25 @@ export default function Itinerario({ trip, editable, store }) {
     <div className="itin">
       <p className="muted itin__lead">
         {editable
-          ? 'Organizá cada día del viaje. Arrastrá para cambiar el orden o tocá una actividad para editarla.'
-          : 'Así está organizado cada día del viaje.'}
+          ? 'Tocá un día del calendario para ver y armar sus actividades.'
+          : 'Tocá un día del calendario para ver sus actividades.'}
       </p>
-      {dias.map((d) => (
-        <Dia
-          key={d.fecha}
-          dia={d}
-          eventos={porDia.get(d.fecha) || []}
-          editable={editable}
-          onAbrir={setAbiertoId}
-          onAgregar={agregar}
-          onReordenar={reordenar}
-        />
-      ))}
+      {dias.length > 0 && (
+        <CalendarioViaje dias={dias} porDia={porDia} seleccion={seleccion} onSeleccionar={setElegido} />
+      )}
+      {diaSel && (
+        <div className="itin__day glass glass--md">
+          <Dia
+            key={diaSel.fecha}
+            dia={diaSel}
+            eventos={porDia.get(diaSel.fecha) || []}
+            editable={editable}
+            onAbrir={setAbiertoId}
+            onAgregar={agregar}
+            onReordenar={reordenar}
+          />
+        </div>
+      )}
       {fuera.length > 0 && (
         <Dia
           dia={{ fecha: null }}

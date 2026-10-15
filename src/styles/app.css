@@ -1855,3 +1855,182 @@
     padding: 8px 2px;
   }
 }
+
+/* ---------- Itinerario como calendario ---------- */
+.tcal {
+  display: grid;
+  gap: 8px;
+}
+
+.tcal__title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.tcal__title::first-letter {
+  text-transform: uppercase;
+}
+
+.tcal__head,
+.tcal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.tcal__head span {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-3);
+  padding: 0 6px;
+}
+
+.tcal__cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 112px;
+  padding: 8px;
+  border-radius: 14px;
+  text-align: left;
+  background: var(--glass);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+  transition:
+    box-shadow 0.25s,
+    background-color 0.25s,
+    transform 0.4s var(--ease);
+}
+
+button.tcal__cell:hover {
+  background: var(--glass-2);
+}
+
+.tcal__cell.is-out {
+  background: transparent;
+  box-shadow: none;
+  opacity: 0.35;
+}
+
+.tcal__cell.is-sel {
+  box-shadow: inset 0 0 0 2px var(--red);
+  background: color-mix(in oklab, var(--red) 10%, var(--glass));
+}
+
+.tcal__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.tcal__num {
+  font-weight: 650;
+  font-size: 0.95rem;
+}
+
+.tcal__num small {
+  font-size: 0.72rem;
+  font-weight: 550;
+  color: var(--text-2);
+}
+
+.is-today .tcal__num {
+  color: var(--accent-text);
+}
+
+.tcal__dia {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.tcal__evs {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tcal__ev {
+  display: block;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--red) 16%, transparent);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tcal__ev b {
+  font-weight: 650;
+  color: var(--accent-text);
+}
+
+.tcal__more {
+  font-size: 0.7rem;
+  color: var(--text-3);
+  padding-left: 4px;
+}
+
+.tcal__dots {
+  display: none;
+}
+
+.itin__day {
+  padding: 16px 18px 18px;
+}
+
+@media (max-width: 720px) {
+  .tcal__head,
+  .tcal__grid {
+    gap: 4px;
+  }
+
+  .tcal__head span {
+    padding: 0;
+    text-align: center;
+  }
+
+  .tcal__cell {
+    min-height: 58px;
+    padding: 6px 4px;
+    align-items: center;
+    border-radius: 12px;
+  }
+
+  .tcal__top {
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .tcal__num small {
+    display: none;
+  }
+
+  .tcal__evs {
+    display: none;
+  }
+
+  .tcal__dots {
+    display: flex;
+    gap: 3px;
+    margin-top: auto;
+  }
+
+  .tcal__dots i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--red);
+  }
+
+  .itin__day {
+    padding: 12px;
+  }
+}
