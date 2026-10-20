@@ -7,6 +7,8 @@ import {
   onSnapshot,
   query,
   where,
+  orderBy,
+  limit,
   getDoc,
   setDoc,
   updateDoc,
@@ -77,13 +79,21 @@ export function createFirebaseStore(db) {
     },
 
     async deleteTrip(tripId) {
-      const [items, eventos] = await Promise.all([
+      const [items, eventos, actividad, altas] = await Promise.all([
         getDocs(collection(db, 'trips', tripId, 'items')),
         getDocs(collection(db, 'trips', tripId, 'itinerario')),
+        getDocs(collection(db, 'trips', tripId, 'actividad')),
+        getDocs(collection(db, 'trips', tripId, 'joins')).catch(() => ({ forEach: () => {} })),
       ]);
+      const comentarios = await Promise.all(
+        items.docs.map((d) => getDocs(collection(db, 'trips', tripId, 'items', d.id, 'comentarios'))),
+      );
       const batch = writeBatch(db);
+      comentarios.forEach((snap) => snap.forEach((d) => batch.delete(d.ref)));
       items.forEach((d) => batch.delete(d.ref));
       eventos.forEach((d) => batch.delete(d.ref));
+      actividad.forEach((d) => batch.delete(d.ref));
+      altas.forEach((d) => batch.delete(d.ref));
       batch.delete(doc(db, 'trips', tripId));
       await batch.commit();
     },
@@ -177,13 +187,44 @@ export function createFirebaseStore(db) {
       return s.exists() ? conId(s) : null;
     },
 
+    // El token viaja en un registro privado (joins/{uid}) del mismo lote:
+    // las reglas lo validan sin que quede visible para el resto del grupo.
     joinTrip(user, { tripId, token, rol }) {
-      return updateDoc(doc(db, 'trips', tripId), {
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'trips', tripId, 'joins', user.uid), { token, rol, creado: serverTimestamp() });
+      batch.update(doc(db, 'trips', tripId), {
         [`miembros.${user.uid}`]: rol,
         miembrosUids: arrayUnion(user.uid),
         [`miembrosInfo.${user.uid}`]: { nombre: user.displayName || 'Invitado', foto: user.photoURL || null },
-        joinToken: token,
       });
+      return batch.commit();
+    },
+
+    // Comentarios de un item, del mas viejo al mas nuevo
+    subscribeComentarios(tripId, itemId, onData, onError) {
+      const q = query(collection(db, 'trips', tripId, 'items', itemId, 'comentarios'), orderBy('creado', 'asc'));
+      return onSnapshot(q, (s) => onData(s.docs.map(conId)), onError);
+    },
+
+    addComentario(tripId, itemId, comentario) {
+      return setDoc(doc(collection(db, 'trips', tripId, 'items', itemId, 'comentarios')), {
+        ...comentario,
+        creado: serverTimestamp(),
+      });
+    },
+
+    deleteComentario(tripId, itemId, comentarioId) {
+      return deleteDoc(doc(db, 'trips', tripId, 'items', itemId, 'comentarios', comentarioId));
+    },
+
+    // Actividad del grupo: las ultimas 40 acciones
+    subscribeActividad(tripId, onData, onError) {
+      const q = query(collection(db, 'trips', tripId, 'actividad'), orderBy('creado', 'desc'), limit(40));
+      return onSnapshot(q, (s) => onData(s.docs.map(conId)), onError);
+    },
+
+    registrarActividad(tripId, evento) {
+      return setDoc(doc(collection(db, 'trips', tripId, 'actividad')), { ...evento, creado: serverTimestamp() });
     },
 
     setMemberRole(tripId, uid, rol) {

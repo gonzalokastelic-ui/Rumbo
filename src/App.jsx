@@ -11,6 +11,7 @@ const NuevoViaje = lazy(() => import('./pages/NuevoViaje.jsx'));
 const Viaje = lazy(() => import('./pages/Viaje.jsx'));
 const Unirse = lazy(() => import('./pages/Unirse.jsx'));
 const Perfil = lazy(() => import('./pages/Perfil.jsx'));
+const Imprimir = lazy(() => import('./pages/Imprimir.jsx'));
 
 function Privada({ children }) {
   const { listo, user, perfil, perfilListo } = useAuth();
@@ -60,6 +61,7 @@ export default function App() {
             <Route path="/viajes" element={<Privada><Dashboard /></Privada>} />
             <Route path="/viajes/nuevo" element={<Privada><NuevoViaje /></Privada>} />
             <Route path="/viaje/:id" element={<Privada><Viaje /></Privada>} />
+            <Route path="/viaje/:id/imprimir" element={<Privada><Imprimir /></Privada>} />
             <Route path="/unirse/:token" element={<Privada><Unirse /></Privada>} />
             <Route path="/perfil" element={<Privada><Perfil /></Privada>} />
             <Route path="*" element={<NoEncontrada />} />

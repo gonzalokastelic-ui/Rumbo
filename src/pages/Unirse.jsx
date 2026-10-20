@@ -29,6 +29,14 @@ export default function Unirse() {
     setUniendo(true);
     try {
       await store.joinTrip(user, { tripId: invite.tripId, token, rol: invite.rol });
+      store
+        .registrarActividad?.(invite.tripId, {
+          uid: user.uid,
+          nombre: (user.displayName || 'Alguien').slice(0, 80),
+          tipo: 'union',
+          texto: `se unió al viaje como ${invite.rol === 'editor' ? 'editor' : 'lector'}`,
+        })
+        .catch(() => {});
       toast.ok('Ya sos parte del viaje.');
       navigate(`/viaje/${invite.tripId}`, { replace: true });
     } catch (e) {

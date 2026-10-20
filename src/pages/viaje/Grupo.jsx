@@ -5,6 +5,7 @@ import { useSub } from '../../lib/useSub.js';
 import { mensajeError, ROLES } from '../../lib/viajes.js';
 import { Avatar, useToast } from '../../components/ui.jsx';
 import { GRUPOS_POR_ID } from '../../data/pasajeros.js';
+import { hace } from '../../lib/actividad.js';
 
 const linkDe = (token) => `${window.location.origin}/unirse/${token}`;
 
@@ -85,9 +86,38 @@ export default function Grupo({ trip, user, store }) {
   };
 
   const pasajeros = trip.pasajeros || [];
+  const { data: actividad, cargando: cargandoAct } = useSub(
+    (ok, ko) => store.subscribeActividad(trip.id, ok, ko),
+    [store, trip.id],
+  );
 
   return (
     <div className="group">
+      <section className="glass cat" aria-labelledby="g-actividad">
+        <header className="cat__head">
+          <h3 id="g-actividad">Actividad reciente</h3>
+        </header>
+        {cargandoAct ? (
+          <p className="muted notice">Cargando actividad…</p>
+        ) : !actividad?.length ? (
+          <p className="muted notice">
+            Acá vas a ver lo que hace cada persona del grupo: lo que tilda, agrega, comenta o agenda.
+          </p>
+        ) : (
+          <ol className="feed">
+            {actividad.map((a) => (
+              <li key={a.id} className="feed__item">
+                <Avatar nombre={a.nombre} rojo={a.uid === user.uid} />
+                <p>
+                  <strong>{a.nombre}</strong>{a.uid === user.uid && <span className="muted"> (vos)</span>} {a.texto}
+                  <span className="muted feed__when"> {hace(a.creado)}</span>
+                </p>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
       {pasajeros.length > 0 && (
         <section className="glass cat" aria-labelledby="g-pasajeros">
           <header className="cat__head">

@@ -7,8 +7,13 @@ import {
   ArrowUpRight,
   AirplaneTilt,
   Bed,
+  CalendarPlus,
+  ChatCircleDots,
   Check,
+  DeviceMobile,
   Eye,
+  FilePdf,
+  Pulse,
   Link as LinkIcon,
   PencilSimple,
   ShareNetwork,
@@ -98,9 +103,9 @@ function Hero() {
 
 /* ================= 2. Como funciona (pinned, scrub) ================= */
 const PASOS = [
-  { t: 'Elegís el destino', d: 'Argentina de origen, una de las 8 ciudades y tus fechas.' },
-  { t: 'El checklist se arma solo', d: 'Documentos, salud, vuelos y alojamiento según el país.' },
-  { t: 'Vas tachando y compartís', d: 'Cada ítem cambia de estado y todos ven el avance.' },
+  { t: 'Elegís destino y quiénes viajan', d: 'Una de las 8 ciudades, tus fechas y la edad y nacionalidad de cada pasajero.' },
+  { t: 'El checklist se arma solo', d: 'Documentos, salud, vuelos y alojamiento según el país y según quién viaja.' },
+  { t: 'Tachás, agendás y compartís', d: 'Cada ítem cambia de estado, se suma al itinerario y todos ven el avance.' },
 ];
 
 function ComoFunciona() {
@@ -119,8 +124,8 @@ function ComoFunciona() {
       const cont = { v: 0 };
 
       gsap.set(barra, { scaleX: 0, transformOrigin: 'left' });
-      gsap.set(filas, { opacity: 0.35 });
-      gsap.set(pasos, { opacity: 0.4 });
+      gsap.set(filas, { opacity: 0.8 });
+      gsap.set(pasos, { opacity: 0.75 });
       gsap.set(pasos[0], { opacity: 1 });
 
       const tl = gsap.timeline({
@@ -140,7 +145,7 @@ function ComoFunciona() {
         tl.to(fila, { opacity: 1, duration: 0.5 }, i)
           .to(marca, { scale: 1, backgroundColor: 'var(--red)', duration: 0.4 }, i + 0.3)
           .to(fila.querySelector('.how__tick'), { opacity: 1, scale: 1, duration: 0.3 }, i + 0.45)
-          .to(fila.querySelector('.how__name'), { opacity: 0.55, duration: 0.3 }, i + 0.55);
+          .to(fila.querySelector('.how__name'), { opacity: 0.68, duration: 0.3 }, i + 0.55);
       });
       tl.to(barra, { scaleX: 1, duration: filas.length }, 0.3);
       tl.to(
@@ -157,9 +162,9 @@ function ComoFunciona() {
         },
         0.3,
       );
-      tl.to(pasos[0], { opacity: 0.4, duration: 0.4 }, 2)
+      tl.to(pasos[0], { opacity: 0.75, duration: 0.4 }, 2)
         .to(pasos[1], { opacity: 1, duration: 0.4 }, 2)
-        .to(pasos[1], { opacity: 0.4, duration: 0.4 }, 4)
+        .to(pasos[1], { opacity: 0.75, duration: 0.4 }, 4)
         .to(pasos[2], { opacity: 1, duration: 0.4 }, 4);
     });
     return () => mm.revert();
@@ -410,7 +415,130 @@ function FechasLimite() {
   );
 }
 
-/* ================= 5. Recomendados (bento con datos reales) ================= */
+/* ================= 5. Pasajeros e itinerario ================= */
+const PAX_EJEMPLO = [
+  { n: 'Martina', d: 'Adulta, argentina', ok: true },
+  { n: 'Lucas', d: 'Adulto, argentino', ok: true },
+  { n: 'Juana', d: 'Menor, 9 años', ok: false },
+];
+
+// Semana de ejemplo: lunes 15 a domingo 21 de febrero de 2027
+const SEMANA = [
+  { d: 15, n: 0 },
+  { d: 16, n: 2, sel: true },
+  { d: 17, n: 1 },
+  { d: 18, n: 3 },
+  { d: 19, n: 0 },
+  { d: 20, n: 2 },
+  { d: 21, n: 1 },
+];
+
+const AGENDA = [
+  { h: '09:30', t: 'Everglades en airboat', l: 'Everglades Safari Park' },
+  { h: '20:00', t: 'Cena en Little Havana', l: 'Calle Ocho' },
+];
+
+const EXTRAS = [
+  { i: ChatCircleDots, t: 'Comentarios', d: 'Deciden en grupo dentro de cada ítem.' },
+  { i: Pulse, t: 'Actividad', d: 'Ves quién tachó qué y cuándo.' },
+  { i: FilePdf, t: 'PDF', d: 'Imprimí el checklist y el itinerario.' },
+  { i: DeviceMobile, t: 'Instalable', d: 'Abrila desde la pantalla de inicio.' },
+];
+
+function Viajeros() {
+  const listos = PAX_EJEMPLO.filter((p) => p.ok).length;
+  return (
+    <section id="viajeros" className="crew container" aria-labelledby="crew-titulo">
+      <div className="crew__copy">
+        <Reveal as="h2" id="crew-titulo">
+          Cada pasajero, sus trámites. Cada día, su plan.
+        </Reveal>
+        <Reveal as="p" className="muted" i={1}>
+          Si viaja un menor o alguien con otra nacionalidad, el checklist suma lo que le toca. Y lo que reservás va
+          directo al calendario del viaje.
+        </Reveal>
+      </div>
+
+      <div className="crew__grid">
+        <Reveal as="article" className="crew__pax glass">
+          <header className="crew__head">
+            <div>
+              <p className="hero__card-kicker">Documentación</p>
+              <h3>Pasaporte vigente</h3>
+            </div>
+            <span className="chip mono">
+              {listos}/{PAX_EJEMPLO.length} pasajeros
+            </span>
+          </header>
+          <ul className="crew__list">
+            {PAX_EJEMPLO.map((p) => (
+              <li key={p.n} className={p.ok ? 'is-ok' : ''}>
+                <span className="crew__box" aria-hidden="true">
+                  {p.ok && <Check size={14} weight="bold" />}
+                </span>
+                <span>
+                  <strong>{p.n}</strong>
+                  <small className="muted">{p.d}</small>
+                </span>
+                <span className="sr-only">{p.ok ? 'listo' : 'pendiente'}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="muted crew__note">Y como viaja una menor, se suma la autorización de viaje firmada.</p>
+        </Reveal>
+
+        <Reveal as="article" className="crew__cal glass" i={1}>
+          <header className="crew__head">
+            <div>
+              <p className="hero__card-kicker">Itinerario</p>
+              <h3>Semana en Miami</h3>
+            </div>
+            <span className="chip chip--red">
+              <CalendarPlus size={14} /> Exportar
+            </span>
+          </header>
+          <ol className="crew__week" aria-label="Días con actividades">
+            {SEMANA.map((x) => (
+              <li key={x.d} className={x.sel ? 'is-sel' : ''}>
+                <span className="mono">{x.d}</span>
+                <span className="sr-only">{`${x.n} actividades`}</span>
+                <span className="crew__dots" aria-hidden="true">
+                  {Array.from({ length: x.n }, (_, k) => (
+                    <i key={k} />
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <p className="crew__day">Día 2, mar 16 feb</p>
+          <ul className="crew__agenda">
+            {AGENDA.map((a) => (
+              <li key={a.t}>
+                <span className="mono">{a.h}</span>
+                <span>
+                  <strong>{a.t}</strong>
+                  <small className="muted">{a.l}</small>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Reveal>
+      </div>
+
+      <ul className="crew__extras">
+        {EXTRAS.map(({ i: Icono, t, d }, k) => (
+          <Reveal as="li" key={t} className="glass glass--md" i={k}>
+            <Icono size={22} weight="duotone" />
+            <strong>{t}</strong>
+            <span className="muted">{d}</span>
+          </Reveal>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/* ================= 6. Recomendados (bento con datos reales) ================= */
 function Barras({ id }) {
   const cal = calendario(id);
   const max = Math.max(...cal.map((c) => c.precio));
@@ -498,12 +626,12 @@ function Recomendados() {
   );
 }
 
-/* ================= 6. Compartir con roles ================= */
+/* ================= 7. Compartir con roles ================= */
 function Compartir() {
   const [rol, setRol] = useState('editor');
   const permisos = {
-    editor: ['Ve todo el viaje', 'Tacha y agrega ítems', 'Cambia fechas y notas', 'No puede borrar el viaje'],
-    viewer: ['Ve todo el viaje', 'Sigue el progreso', 'No puede modificar nada', 'No puede borrar el viaje'],
+    editor: ['Ve todo el viaje', 'Tacha y agrega ítems', 'Comenta en cada ítem', 'No puede borrar el viaje'],
+    viewer: ['Ve todo el viaje', 'Sigue el progreso y los comentarios', 'No puede modificar nada', 'No puede borrar el viaje'],
   };
   return (
     <section id="compartir" className="share container" aria-labelledby="share-titulo">
@@ -570,7 +698,7 @@ function Compartir() {
   );
 }
 
-/* ================= 7. Cierre ================= */
+/* ================= 8. Cierre ================= */
 function Cierre() {
   return (
     <section className="finale container" aria-labelledby="finale-titulo">
@@ -670,6 +798,7 @@ export default function Landing() {
           <ComoFunciona />
           <Destinos stageRefs={stageRefs} />
           <FechasLimite />
+          <Viajeros />
           <Recomendados />
           <Compartir />
           <Cierre />

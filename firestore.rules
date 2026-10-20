@@ -1,11 +1,14 @@
 rules_version = '2';
 
-// Reglas de Rumbo.
+// Reglas de Rumbo (V3).
 // Modelo: cada viaje tiene un mapa `miembros` { uid: 'owner' | 'editor' | 'viewer' }
 // y un arreglo `miembrosUids` (necesario para consultar "mis viajes").
+// Toda la seguridad vive aca: se evalua en los servidores de Google en cada pedido.
 // Se publican desde Firebase Console > Firestore > Reglas.
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ---------- Utilidades ----------
 
     function signedIn() {
       return request.auth != null;
@@ -19,55 +22,97 @@ service cloud.firestore {
       return get(tripPath(tripId)).data.miembros[request.auth.uid];
     }
 
+    function isMember(tripId) {
+      return signedIn() && roleIn(tripId) in ['owner', 'editor', 'viewer'];
+    }
+
+    function canEdit(tripId) {
+      return signedIn() && roleIn(tripId) in ['owner', 'editor'];
+    }
+
+    function textoOpcional(d, campo, max) {
+      return !(campo in d) || d[campo] == null || (d[campo] is string && d[campo].size() <= max);
+    }
+
+    // Solo links web: evita guardar esquemas como javascript:
+    function linkValido(d) {
+      return !('link' in d) || d.link == null || d.link == ''
+        || (d.link is string && d.link.size() <= 1000 && d.link.matches('^https?://.+'));
+    }
+
+    // ---------- Validaciones de cada tipo de documento ----------
+
     function validTrip(d) {
-      return d.nombre is string && d.nombre.size() > 0 && d.nombre.size() <= 80
-        && d.destinoId is string
+      return d.keys().size() <= 30
+        && d.nombre is string && d.nombre.size() > 0 && d.nombre.size() <= 80
+        && d.destinoId is string && d.destinoId.size() <= 20
         && d.viajeros is int && d.viajeros >= 1 && d.viajeros <= 20
         && (!('pasajeros' in d) || (d.pasajeros is list && d.pasajeros.size() <= 20));
     }
 
+    function validItem(d) {
+      return d.keys().size() <= 25
+        && d.titulo is string && d.titulo.size() > 0 && d.titulo.size() <= 120
+        && d.categoria in ['documentacion', 'salud', 'transporte', 'alojamiento', 'actividades', 'dinero']
+        && d.estado in ['pendiente', 'tramite', 'listo']
+        && textoOpcional(d, 'notas', 600)
+        && textoOpcional(d, 'desc', 600)
+        && linkValido(d)
+        && (!('costo' in d) || d.costo == null || (d.costo is number && d.costo >= 0 && d.costo <= 10000000))
+        && (!('personas' in d) || d.personas == null || (d.personas is map && d.personas.size() <= 20));
+    }
+
     function validEvento(d) {
-      return d.titulo is string && d.titulo.size() > 0 && d.titulo.size() <= 120
+      return d.keys().size() <= 12
+        && d.titulo is string && d.titulo.size() > 0 && d.titulo.size() <= 120
         && d.fecha is string && d.fecha.size() == 10
-        && (d.hora == null || (d.hora is string && d.hora.size() == 5));
+        && (d.hora == null || (d.hora is string && d.hora.size() == 5))
+        && textoOpcional(d, 'lugar', 120)
+        && textoOpcional(d, 'notas', 600);
     }
 
     function validPerfil(d) {
-      return d.nombre is string && d.nombre.size() >= 2 && d.nombre.size() <= 80
+      return d.keys().hasOnly(['nombre', 'nacimiento', 'nacionalidad', 'actualizado'])
+        && d.nombre is string && d.nombre.size() >= 2 && d.nombre.size() <= 80
         && d.nacimiento is string && d.nacimiento.size() == 10
         && d.nacionalidad is string && d.nacionalidad.size() <= 40;
     }
 
-    function validItem(d) {
-      return d.titulo is string && d.titulo.size() > 0 && d.titulo.size() <= 120
-        && d.categoria is string
-        && d.estado in ['pendiente', 'tramite', 'listo']
-        && (!('notas' in d) || d.notas.size() <= 600);
-    }
+    // ---------- Unirse y salir: cada persona solo se agrega o se quita a si misma ----------
 
-    // Alguien con un link de invitacion activo se agrega a si mismo, y solo a si mismo.
+    // Al unirse, el cliente escribe en el mismo lote trips/{id}/joins/{uid} con el token
+    // del link. La regla lo lee con getAfter: el token nunca queda guardado en el viaje.
     function joining(tripId) {
       let d = request.resource.data;
       let o = resource.data;
-      let invite = get(/databases/$(database)/documents/invites/$(d.joinToken)).data;
-      return d.diff(o).affectedKeys().hasOnly(['miembros', 'miembrosUids', 'miembrosInfo', 'joinToken'])
-        && !(request.auth.uid in o.miembrosUids)
-        && request.auth.uid in d.miembrosUids
+      let uid = request.auth.uid;
+      let alta = getAfter(/databases/$(database)/documents/trips/$(tripId)/joins/$(uid)).data;
+      let invite = get(/databases/$(database)/documents/invites/$(alta.token)).data;
+      return d.diff(o).affectedKeys().hasOnly(['miembros', 'miembrosUids', 'miembrosInfo'])
+        && !(uid in o.miembrosUids)
         && d.miembrosUids.size() == o.miembrosUids.size() + 1
-        && d.miembros.diff(o.miembros).affectedKeys().hasOnly([request.auth.uid])
+        && d.miembrosUids.toSet() == o.miembrosUids.toSet().union([uid].toSet())
+        && d.miembros.diff(o.miembros).affectedKeys().hasOnly([uid])
+        && d.miembrosInfo.diff(o.miembrosInfo).affectedKeys().hasOnly([uid])
         && invite.tripId == tripId
         && invite.activo == true
-        && d.miembros[request.auth.uid] == invite.rol;
+        && d.miembros[uid] == invite.rol;
     }
 
-    // Un miembro puede salirse del viaje (no el owner).
     function leaving() {
       let d = request.resource.data;
       let o = resource.data;
+      let uid = request.auth.uid;
       return d.diff(o).affectedKeys().hasOnly(['miembros', 'miembrosUids', 'miembrosInfo'])
-        && o.miembros[request.auth.uid] != 'owner'
-        && !(request.auth.uid in d.miembrosUids);
+        && uid in o.miembrosUids
+        && o.miembros[uid] != 'owner'
+        && d.miembrosUids.toSet() == o.miembrosUids.toSet().difference([uid].toSet())
+        && d.miembros.diff(o.miembros).affectedKeys().hasOnly([uid])
+        && !(uid in d.miembros)
+        && d.miembrosInfo.diff(o.miembrosInfo).affectedKeys().hasOnly([uid]);
     }
+
+    // ---------- Viajes ----------
 
     match /trips/{tripId} {
       allow read: if signedIn() && request.auth.uid in resource.data.miembrosUids;
@@ -75,58 +120,104 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.miembrosUids == [request.auth.uid]
+        && request.resource.data.miembros.keys().hasOnly([request.auth.uid])
         && request.resource.data.miembros[request.auth.uid] == 'owner'
         && validTrip(request.resource.data);
 
       allow update: if signedIn() && (
         (resource.data.ownerId == request.auth.uid
           && request.resource.data.ownerId == request.auth.uid
+          && request.auth.uid in request.resource.data.miembrosUids
+          && request.resource.data.miembros[request.auth.uid] == 'owner'
           && validTrip(request.resource.data))
-        || (resource.data.miembros[request.auth.uid] in ['owner', 'editor']
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resumen']))
+        || (resource.data.miembros[request.auth.uid] == 'editor'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['resumen'])
+          && request.resource.data.resumen is map && request.resource.data.resumen.size() <= 6)
         || joining(tripId)
         || leaving()
       );
 
       allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
 
+      // Registro privado de altas: solo lo ven la persona y el organizador
+      match /joins/{uid} {
+        allow read: if signedIn() && (request.auth.uid == uid || roleIn(tripId) == 'owner');
+        // create y update: quien salio de un viaje puede volver a entrar con otro link
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['token', 'rol', 'creado'])
+          && request.resource.data.token is string
+          && get(/databases/$(database)/documents/invites/$(request.resource.data.token)).data.tripId == tripId
+          && get(/databases/$(database)/documents/invites/$(request.resource.data.token)).data.activo == true;
+        allow delete: if signedIn() && (request.auth.uid == uid || roleIn(tripId) == 'owner');
+      }
+
       match /items/{itemId} {
-        allow read: if signedIn() && roleIn(tripId) in ['owner', 'editor', 'viewer'];
-        // Al crear un viaje, sus items se escriben en el mismo batch: el viaje todavia
+        allow read: if isMember(tripId);
+        // Al crear un viaje, sus items se escriben en el mismo lote: el viaje todavia
         // no existe en la base, por eso se consulta el estado posterior (getAfter).
         allow create: if signedIn()
           && getAfter(tripPath(tripId)).data.miembros[request.auth.uid] in ['owner', 'editor']
           && validItem(request.resource.data);
-        allow update: if signedIn() && roleIn(tripId) in ['owner', 'editor']
-          && validItem(request.resource.data);
-        allow delete: if signedIn() && roleIn(tripId) in ['owner', 'editor'];
+        allow update: if canEdit(tripId) && validItem(request.resource.data);
+        allow delete: if canEdit(tripId);
+
+        // Comentarios: todos los miembros leen; organizador y editores escriben
+        match /comentarios/{comentarioId} {
+          allow read: if isMember(tripId);
+          allow create: if canEdit(tripId)
+            && request.resource.data.keys().hasOnly(['uid', 'nombre', 'texto', 'creado'])
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.texto is string
+            && request.resource.data.texto.size() > 0 && request.resource.data.texto.size() <= 500
+            && request.resource.data.nombre is string && request.resource.data.nombre.size() <= 80;
+          allow delete: if signedIn() && (resource.data.uid == request.auth.uid || roleIn(tripId) == 'owner');
+        }
       }
 
       // Itinerario: todos los miembros lo ven; organizador y editores lo arman
       match /itinerario/{eventoId} {
-        allow read: if signedIn() && roleIn(tripId) in ['owner', 'editor', 'viewer'];
-        allow create, update: if signedIn() && roleIn(tripId) in ['owner', 'editor']
-          && validEvento(request.resource.data);
-        allow delete: if signedIn() && roleIn(tripId) in ['owner', 'editor'];
+        allow read: if isMember(tripId);
+        allow create, update: if canEdit(tripId) && validEvento(request.resource.data);
+        allow delete: if canEdit(tripId);
+      }
+
+      // Actividad del grupo: cada miembro registra solo sus propias acciones; nadie la edita
+      match /actividad/{eventoId} {
+        allow read: if isMember(tripId);
+        allow create: if isMember(tripId)
+          && request.resource.data.keys().hasOnly(['uid', 'nombre', 'tipo', 'texto', 'creado'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.texto is string && request.resource.data.texto.size() <= 200
+          && request.resource.data.tipo is string && request.resource.data.tipo.size() <= 20
+          && request.resource.data.nombre is string && request.resource.data.nombre.size() <= 80;
+        allow delete: if signedIn() && roleIn(tripId) == 'owner';
       }
     }
 
-    // Perfil: cada persona lee y escribe solo el suyo
-    match /users/{uid} {
-      allow read: if signedIn() && request.auth.uid == uid;
-      allow create, update: if signedIn() && request.auth.uid == uid && validPerfil(request.resource.data);
-      allow delete: if false;
-    }
+    // ---------- Invitaciones ----------
 
     // El token es largo e impredecible: se permite `get` pero no listar todos.
     match /invites/{token} {
       allow get: if signedIn();
       allow list: if signedIn() && resource.data.ownerId == request.auth.uid;
       allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['tripId', 'rol', 'ownerId', 'activo', 'creado'])
         && request.resource.data.ownerId == request.auth.uid
         && get(tripPath(request.resource.data.tripId)).data.ownerId == request.auth.uid
-        && request.resource.data.rol in ['editor', 'viewer'];
-      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+        && request.resource.data.rol in ['editor', 'viewer']
+        && request.resource.data.activo == true;
+      allow update: if signedIn() && resource.data.ownerId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activo']);
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // ---------- Perfiles ----------
+
+    // Cada persona lee y escribe solo su propio perfil
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid && validPerfil(request.resource.data);
+      allow delete: if false;
     }
   }
 }

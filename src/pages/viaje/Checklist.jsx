@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   DndContext,
   KeyboardSensor,
@@ -35,7 +36,10 @@ import { CATEGORIAS, CATEGORIAS_POR_ID } from '../../data/requisitos.js';
 import { diasDelViaje, formatoCorto, urgencia } from '../../lib/fechas.js';
 import { mensajeError, ordenarItems, estaVencido } from '../../lib/viajes.js';
 import { useToast } from '../../components/ui.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { cita, crearRegistro } from '../../lib/actividad.js';
 import ItemDrawer from './ItemDrawer.jsx';
+import Comentarios from './Comentarios.jsx';
 
 const FILTROS = [
   { id: 'todos', nombre: 'Todos' },
@@ -184,8 +188,12 @@ function Seccion({ id, todos, visibles, trip, editable, onPatch, onAbrir, onReor
 
 export default function Checklist({ trip, items, editable, store, nota }) {
   const toast = useToast();
+  const { user } = useAuth();
+  const [params, setParams] = useSearchParams();
   const [filtro, setFiltro] = useState('todos');
-  const [abiertoId, setAbiertoId] = useState(null);
+  // ?item=<id> abre el detalle directo (por ejemplo, desde el panel "Hoy")
+  const [abiertoId, setAbiertoId] = useState(() => params.get('item'));
+  const registrar = useMemo(() => crearRegistro(store, trip, user), [store, trip, user]);
   const [agregarAbierto, setAgregarAbierto] = useState(false);
   const [titulo, setTitulo] = useState('');
   const [categoria, setCategoria] = useState('documentacion');
@@ -206,7 +214,9 @@ export default function Checklist({ trip, items, editable, store, nota }) {
         orden: Date.now(),
       });
       const dia = dias.find((d) => d.fecha === fecha);
-      toast.ok(`Agendado para el ${dia ? dia.etiqueta.toLowerCase() : fecha}.`);
+      const cuando = dia ? dia.etiqueta.toLowerCase() : fecha;
+      toast.ok(`Agendado para el ${cuando}.`);
+      registrar('agenda', `agendó ${cita(item.titulo)} para el ${cuando}`);
     } catch (e) {
       toast.error(mensajeError(e));
     }
@@ -228,9 +238,30 @@ export default function Checklist({ trip, items, editable, store, nota }) {
       .filter((s) => s.visibles.length > 0);
   }, [items, filtro]);
 
+  // Deja en la actividad del grupo los cambios que importan a los demas
+  const registrarCambio = (item, cambios) => {
+    if (cambios.personas && item.personas) {
+      const nuevos = Object.keys(cambios.personas).filter((id) => cambios.personas[id] && !item.personas[id]);
+      if (nuevos.length === 1 && Object.keys(item.personas).length > 1) {
+        const p = (trip.pasajeros || []).find((x) => x.id === nuevos[0]);
+        registrar('persona', `tildó a ${p?.nombre || 'un pasajero'} en ${cita(item.titulo)}`);
+        return;
+      }
+    }
+    if (cambios.estado && cambios.estado !== item.estado) {
+      const textos = {
+        listo: `marcó ${cita(item.titulo)} como listo`,
+        tramite: `puso ${cita(item.titulo)} en trámite`,
+        pendiente: `volvió a pendiente ${cita(item.titulo)}`,
+      };
+      registrar('estado', textos[cambios.estado]);
+    }
+  };
+
   const patch = async (item, cambios) => {
     try {
       await store.updateItem(trip.id, item.id, cambios);
+      registrarCambio(item, cambios);
     } catch (e) {
       toast.error(mensajeError(e));
     }
@@ -249,6 +280,7 @@ export default function Checklist({ trip, items, editable, store, nota }) {
       await store.deleteItem(trip.id, item.id);
       setAbiertoId(null);
       toast.ok('Ítem eliminado.');
+      registrar('eliminar', `eliminó ${cita(item.titulo)}`);
     } catch (e) {
       toast.error(mensajeError(e));
     }
@@ -278,6 +310,7 @@ export default function Checklist({ trip, items, editable, store, nota }) {
       });
       setTitulo('');
       toast.ok('Ítem agregado.');
+      registrar('agregar', `agregó ${cita(t)}`);
     } catch (e) {
       toast.error(mensajeError(e));
     } finally {
@@ -380,8 +413,18 @@ export default function Checklist({ trip, items, editable, store, nota }) {
           onAgendar={agendar}
           onPatch={patch}
           onDelete={borrar}
-          onClose={() => setAbiertoId(null)}
-        />
+          onClose={() => {
+            setAbiertoId(null);
+            // El link del panel "Hoy" abre el item con ?item=; al cerrarlo se limpia
+            if (params.has('item')) {
+              const p = new URLSearchParams(params);
+              p.delete('item');
+              setParams(p, { replace: true });
+            }
+          }}
+        >
+          <Comentarios trip={trip} item={abierto} user={user} editable={editable} store={store} registrar={registrar} />
+        </ItemDrawer>
       )}
     </div>
   );

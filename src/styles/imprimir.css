@@ -1,0 +1,152 @@
+/* Version imprimible: papel blanco, tinta negra y el rojo de la marca solo como detalle */
+.print {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  background: #fff;
+  color: #17171a;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  min-height: 100dvh;
+}
+
+body:has(.print) {
+  background: #fff;
+}
+
+.print h1 {
+  font-size: 2rem;
+  margin: 4px 0;
+  letter-spacing: -0.03em;
+}
+
+.print h2 {
+  font-size: 1.15rem;
+  margin: 28px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #17171a;
+}
+
+.print h3 {
+  font-size: 0.95rem;
+  margin: 16px 0 6px;
+  color: #c3231d;
+}
+
+.print ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.print__bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.print__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #17171a;
+}
+
+.print__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: #dc2f28;
+  color: #fff;
+  font-weight: 600;
+}
+
+.print__kicker {
+  font-weight: 700;
+  color: #c3231d;
+}
+
+.print__pax li {
+  padding: 2px 0;
+}
+
+.print__cat li,
+.print__day li {
+  display: flex;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid #e6e3e1;
+  break-inside: avoid;
+}
+
+.print__cat small,
+.print__day small {
+  display: block;
+  color: #55555c;
+  font-size: 0.82rem;
+}
+
+.print__notes {
+  font-style: italic;
+}
+
+.print__box {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  border: 1.5px solid #17171a;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.print .is-done strong {
+  text-decoration: line-through;
+  color: #55555c;
+}
+
+.print__hora {
+  flex: none;
+  width: 48px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: #c3231d;
+}
+
+.print__foot {
+  margin-top: 32px;
+  font-size: 0.8rem;
+  color: #55555c;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print {
+    padding: 0;
+    max-width: none;
+  }
+
+  .print h2 {
+    break-after: avoid;
+  }
+
+  .print__itin {
+    break-before: page;
+  }
+}
+
+/* El fondo fotografico no se imprime ni se ve en esta pantalla */
+body:has(.print) .stage {
+  display: none;
+}

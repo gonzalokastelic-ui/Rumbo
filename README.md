@@ -1,7 +1,7 @@
 # Rumbo
 
 Organizá un viaje desde cero. Elegís un destino y Rumbo arma el checklist completo según el país (documentos,
-salud, vuelos, alojamiento, actividades), calcula las fechas límite hacia atrás desde tu salida, recomienda
+salud, vuelos, alojamiento, actividades) y según quién viaja, arma el itinerario día por día, recomienda
 vuelos (SlickTrip) y hoteles (Brek) y te deja compartir el viaje con un link de **editor** o **solo lectura**.
 
 Rumbo **no vende** pasajes ni alojamiento: organiza y recomienda.
@@ -19,6 +19,13 @@ Rumbo **no vende** pasajes ni alojamiento: organiza y recomienda.
 - **Presupuesto** total, por persona y por categoría.
 - **Recomendados**: calendario de precios de vuelos, aerolíneas directas, hoteles y actividades, con links a SlickTrip y Brek ya cargados con tus fechas.
 - **Grupos y roles**: invitás por link, elegís editor o solo lectura, cambiás el rol o cerrás el link cuando quieras.
+- **Comentarios por ítem**: organizador y editores comentan dentro de cada ítem; los lectores los leen.
+- **Actividad del grupo**: quién agregó, tachó, agendó o comentó cada cosa, en la pestaña Grupo.
+- **Para resolver esta semana**: en Mis viajes, los trámites vencidos o que vencen en 7 días, con acceso directo al ítem.
+- **Exportar el itinerario** a un archivo `.ics` (Google Calendar, Apple Calendar, Outlook).
+- **Imprimir o guardar en PDF** el checklist, los pasajeros y el itinerario.
+- **Celebración** cuando el checklist llega al 100%.
+- **Instalable (PWA)**: manifest, íconos y service worker; abre sin conexión con la última versión guardada.
 - **Tiempo real**: los cambios se ven al instante en todos los dispositivos (onSnapshot).
 - **Tema claro y oscuro**, responsive (celular y computadora).
 
@@ -28,6 +35,14 @@ Rumbo **no vende** pasajes ni alojamiento: organiza y recomienda.
 npm install
 cp .env.example .env   # completá los valores de Firebase
 npm run dev
+```
+
+Otros comandos:
+
+```bash
+npm test         # 40 tests de la lógica (requisitos, pasajeros, fechas, .ics, capa de datos)
+npm run lint
+npm run build && npm run preview
 ```
 
 Sin variables de Firebase la app arranca en **modo demo**: entrás con un botón y los datos viven solo en
@@ -49,6 +64,7 @@ VITE_FIREBASE_API_KEY=...
 VITE_FIREBASE_AUTH_DOMAIN=...
 VITE_FIREBASE_PROJECT_ID=...
 VITE_FIREBASE_APP_ID=...
+VITE_RECAPTCHA_SITE_KEY=...   # opcional, activa App Check
 ```
 
 Reiniciá `npm run dev` después de cambiar `.env`.
@@ -82,6 +98,15 @@ trips/{tripId}/items/{itemId}
 trips/{tripId}/itinerario/{eventoId}
   fecha, hora, titulo, lugar, notas, itemId, orden
 
+trips/{tripId}/items/{itemId}/comentarios/{id}
+  uid, nombre, texto, creado
+
+trips/{tripId}/actividad/{id}
+  uid, nombre, tipo, texto, creado
+
+trips/{tripId}/joins/{uid}
+  token, rol, creado        (registro privado de cómo entró cada invitado)
+
 invites/{token}
   tripId, rol ('editor' | 'viewer'), ownerId, activo
 ```
@@ -89,9 +114,24 @@ invites/{token}
 ### Reglas de seguridad (resumen)
 
 - Solo los miembros de un viaje lo leen. Solo el organizador lo modifica o lo elimina.
-- Editores y organizador crean, modifican y eliminan ítems. Lectores solo leen.
-- Un invitado se agrega a sí mismo, y solo con el rol del link activo que usó.
+- Editores y organizador crean, modifican y eliminan ítems y actividades. Lectores solo leen.
+- Un invitado se agrega a sí mismo y a nadie más, con el rol exacto del link activo que usó. El link queda
+  registrado en `joins/{uid}`, que solo ven esa persona y el organizador (el viaje no guarda el código).
+- Al salir, una persona solo puede quitarse a sí misma; el organizador no puede abandonar su viaje.
+- Comentarios: los escriben editores y organizador con su propio `uid`; los borra el autor o el organizador.
+- La actividad la registra cada miembro a su nombre y no se edita.
+- Todos los documentos tienen campos permitidos y límites de tamaño (títulos, notas, links `http(s)`, costos,
+  cantidad de pasajeros), así nadie puede inflar la base con datos basura.
+- Cada persona lee y escribe solo su perfil (`users/{uid}`).
 - Los links de invitación se pueden obtener con `get` pero no listar; solo el dueño los administra.
+
+### Otras capas de protección
+
+- **App Check** (opcional): con `VITE_RECAPTCHA_SITE_KEY`, Firebase solo acepta pedidos que vienen de la app
+  publicada. Se activa en Firebase Console > App Check (reCAPTCHA v3) y después se aplica a Firestore y Auth.
+- **Encabezados HTTP** en `vercel.json`: HSTS, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`,
+  `Permissions-Policy` y una CSP que impide embeber la app en otros sitios.
+- La API key de Firebase es pública por diseño; conviene restringirla a los dominios de la app en Google Cloud.
 
 ## Publicar en Vercel
 
@@ -100,7 +140,8 @@ invites/{token}
 3. En Settings > Environment Variables cargar las 4 variables `VITE_FIREBASE_*` en Production.
 4. Deploy. Si cambiás variables después, hacé **Redeploy**.
 
-`vercel.json` reescribe todas las rutas a `index.html` para que `/viaje/:id` y `/unirse/:token` funcionen al recargar.
+`vercel.json` reescribe todas las rutas a `index.html` para que `/viaje/:id` y `/unirse/:token` funcionen al recargar,
+y agrega los encabezados de seguridad y de caché (`sw.js` nunca se cachea, para que las actualizaciones lleguen).
 
 ## Datos de recomendaciones
 
@@ -118,13 +159,30 @@ la disponibilidad siempre se ven allí.
 
 ```
 src/
-  data/       destinos, requisitos por destino y plantillas, snapshot de vuelos y hoteles
-  lib/        fechas, links a SlickTrip, capa de datos (Firebase y memoria)
-  context/    autenticación
-  components/ nav, anillo de progreso, toasts, modal
-  pages/      Landing, Login, Dashboard, NuevoViaje, Viaje (+ Checklist, Recomendados, Presupuesto, Grupo), Unirse
-  styles/     tokens, base, componentes, app, landing
+  data/       destinos, requisitos por destino, plantillas y pasajeros, snapshot de vuelos y hoteles
+  lib/        fechas, viajes, actividad, exportación .ics, links a SlickTrip, capa de datos (Firebase y memoria)
+  context/    autenticación y perfil
+  components/ nav, calendarios, pasajeros, celebración, anillo de progreso, toasts, modal
+  pages/      Landing, Login, Perfil, Dashboard (+ PanelHoy), NuevoViaje, Unirse, Imprimir,
+              Viaje (+ Checklist, Comentarios, Itinerario, Recomendados, Presupuesto, Grupo)
+  styles/     tokens, base, componentes, app, landing, calendario, imprimir
+public/       fotos, íconos, manifest.webmanifest, sw.js, robots.txt
+tests/        tests de Vitest
+docs/lighthouse/  reportes de Lighthouse de la V3
 ```
+
+## Calidad
+
+Lighthouse sobre el build de producción (`vite preview`), 20/10/2026:
+
+| Página | Dispositivo | Rendimiento | Accesibilidad | Buenas prácticas | SEO |
+|---|---|---|---|---|---|
+| Landing | Celular | 93 | 100 | 100 | 100 |
+| Landing | Computadora | 100 | 100 | 100 | 100 |
+| Ingresar | Celular | 98 | 100 | 100 | 100 |
+| Ingresar | Computadora | 100 | 100 | 100 | 100 |
+
+Los reportes completos están en `docs/lighthouse/`.
 
 ## Diseño
 

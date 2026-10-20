@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import Celebracion from '../components/Celebracion.jsx';
 import {
   ArrowLeft,
   CalendarBlank,
@@ -12,6 +13,7 @@ import {
   Trash,
   Users,
   Wallet,
+  Printer,
 } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useSub } from '../lib/useSub.js';
@@ -148,7 +150,7 @@ function EliminarViaje({ trip, store, onClose }) {
   );
 }
 
-function MenuViaje({ onEditar, onCompartir, onEliminar }) {
+function MenuViaje({ esOwner, onImprimir, onEditar, onCompartir, onEliminar }) {
   const [abierto, setAbierto] = useState(false);
   const ref = useRef(null);
 
@@ -183,15 +185,24 @@ function MenuViaje({ onEditar, onCompartir, onEliminar }) {
       </button>
       {abierto && (
         <div className="menu__list glass glass--md" role="menu">
-          <button type="button" role="menuitem" onClick={accion(onEditar)}>
-            <PencilSimple size={18} /> Editar viaje
+          {esOwner && (
+            <button type="button" role="menuitem" onClick={accion(onEditar)}>
+              <PencilSimple size={18} /> Editar viaje
+            </button>
+          )}
+          {esOwner && (
+            <button type="button" role="menuitem" onClick={accion(onCompartir)}>
+              <ShareNetwork size={18} /> Compartir
+            </button>
+          )}
+          <button type="button" role="menuitem" onClick={accion(onImprimir)}>
+            <Printer size={18} /> Imprimir o guardar PDF
           </button>
-          <button type="button" role="menuitem" onClick={accion(onCompartir)}>
-            <ShareNetwork size={18} /> Compartir
-          </button>
-          <button type="button" role="menuitem" className="is-danger" onClick={accion(onEliminar)}>
-            <Trash size={18} /> Eliminar viaje
-          </button>
+          {esOwner && (
+            <button type="button" role="menuitem" className="is-danger" onClick={accion(onEliminar)}>
+              <Trash size={18} /> Eliminar viaje
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -221,6 +232,7 @@ function Mensaje({ icono, titulo, texto }) {
 
 export default function Viaje() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user, perfil, store } = useAuth();
   const [params, setParams] = useSearchParams();
   const [editando, setEditando] = useState(false);
@@ -252,6 +264,22 @@ export default function Viaje() {
         ultimoResumen.current = '';
       });
   }, [trip, items, editable, progreso, store]);
+
+  // Los viajes de versiones anteriores guardaban el codigo del ultimo link usado:
+  // el organizador lo borra al abrirlo para que el resto del grupo no lo vea.
+  useEffect(() => {
+    if (trip?.joinToken && trip.ownerId === user.uid) store.updateTrip(trip.id, { joinToken: null }).catch(() => {});
+  }, [trip?.joinToken, trip?.ownerId, trip?.id, user.uid, store]);
+
+  // Celebracion: solo cuando el avance pasa a 100% mientras la pantalla esta abierta
+  const [festejo, setFestejo] = useState(false);
+  const avancePrevio = useRef(null);
+  useEffect(() => {
+    if (!items) return;
+    const completo = progreso.total > 0 && progreso.listos === progreso.total;
+    if (completo && avancePrevio.current !== null && avancePrevio.current < 1) setFestejo(true);
+    avancePrevio.current = progreso.avance;
+  }, [items, progreso]);
 
   if (viaje.error) {
     const denegado = viaje.error.code === 'permission-denied';
@@ -328,6 +356,9 @@ export default function Viaje() {
                   {trip.viajeros} {trip.viajeros === 1 ? 'viajero' : 'viajeros'}
                 </span>
                 {dias != null && dias >= 0 && <span className="is-accent">Faltan {dias} días</span>}
+                {progreso.total > 0 && progreso.listos === progreso.total && (
+                  <span className="is-accent">Listo para viajar</span>
+                )}
                 {vencidos > 0 && (
                   <span className="is-accent">
                     {vencidos} {vencidos === 1 ? 'vencido' : 'vencidos'}
@@ -336,13 +367,13 @@ export default function Viaje() {
               </p>
             </div>
             <ProgressRing value={progreso.avance} size={68} stroke={6} />
-            {rol === 'owner' && (
-              <MenuViaje
-                onEditar={() => setEditando(true)}
-                onCompartir={() => setParams({ tab: 'grupo' })}
-                onEliminar={() => setEliminando(true)}
-              />
-            )}
+            <MenuViaje
+              esOwner={rol === 'owner'}
+              onImprimir={() => navigate(`/viaje/${trip.id}/imprimir`)}
+              onEditar={() => setEditando(true)}
+              onCompartir={() => setParams({ tab: 'grupo' })}
+              onEliminar={() => setEliminando(true)}
+            />
           </header>
 
           <nav className="tv-tabs" aria-label="Secciones del viaje">
@@ -377,6 +408,7 @@ export default function Viaje() {
         <EditarViaje trip={trip} items={items} user={user} perfil={perfil} store={store} onClose={() => setEditando(false)} />
       )}
       {eliminando && <EliminarViaje trip={trip} store={store} onClose={() => setEliminando(false)} />}
+      {festejo && <Celebracion nombre={trip.nombre} onClose={() => setFestejo(false)} />}
     </>
   );
 }

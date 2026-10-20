@@ -8,6 +8,7 @@ import { diasParaViaje, formatoCorto, hoyISO } from '../lib/fechas.js';
 import { ROLES } from '../lib/viajes.js';
 import Nav from '../components/Nav.jsx';
 import { Avatar, Reveal } from '../components/ui.jsx';
+import PanelHoy from './PanelHoy.jsx';
 
 function TarjetaViaje({ trip, uid, i }) {
   const dest = DESTINOS_POR_ID[trip.destinoId];
@@ -130,6 +131,8 @@ export default function Dashboard() {
               </Link>
             </div>
           )}
+
+          {viajes.length > 0 && <PanelHoy viajes={viajes} store={store} />}
 
           {viajes.length > 0 && (
             <div className="trip-grid">

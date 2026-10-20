@@ -10,6 +10,8 @@ export function createMemoryStore() {
   const invites = new Map();
   const eventos = new Map(); // tripId -> Map(eventoId, evento)
   const perfiles = new Map();
+  const comentarios = new Map(); // `${tripId}/${itemId}` -> Map
+  const actividad = new Map(); // tripId -> array
   const listeners = new Set();
 
   const emit = () => listeners.forEach((fn) => fn());
@@ -70,6 +72,7 @@ export function createMemoryStore() {
       trips.delete(tripId);
       items.delete(tripId);
       eventos.delete(tripId);
+      actividad.delete(tripId);
       emit();
     },
 
@@ -122,6 +125,35 @@ export function createMemoryStore() {
     async reorderEventos(tripId, cambios) {
       const m = eventos.get(tripId);
       cambios.forEach(({ id, orden }) => m.set(id, { ...m.get(id), orden }));
+      emit();
+    },
+
+    subscribeComentarios(tripId, itemId, onData) {
+      const k = `${tripId}/${itemId}`;
+      if (!comentarios.has(k)) comentarios.set(k, new Map());
+      return listen(() => [...comentarios.get(k).values()].sort((a, b) => a.creado - b.creado), onData);
+    },
+
+    async addComentario(tripId, itemId, comentario) {
+      const k = `${tripId}/${itemId}`;
+      if (!comentarios.has(k)) comentarios.set(k, new Map());
+      const id = uid();
+      comentarios.get(k).set(id, { id, ...comentario, creado: Date.now() });
+      emit();
+    },
+
+    async deleteComentario(tripId, itemId, comentarioId) {
+      comentarios.get(`${tripId}/${itemId}`)?.delete(comentarioId);
+      emit();
+    },
+
+    subscribeActividad(tripId, onData) {
+      return listen(() => [...(actividad.get(tripId) || [])].sort((a, b) => b.creado - a.creado).slice(0, 40), onData);
+    },
+
+    async registrarActividad(tripId, evento) {
+      if (!actividad.has(tripId)) actividad.set(tripId, []);
+      actividad.get(tripId).push({ id: uid(), ...evento, creado: Date.now() });
       emit();
     },
 

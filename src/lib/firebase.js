@@ -10,6 +10,10 @@ const config = {
 
 export const hasFirebase = Boolean(config.apiKey && config.projectId && config.appId);
 
+// App Check (opcional): con una clave de reCAPTCHA v3, Firebase solo acepta pedidos
+// que vienen de esta app publicada. Los scripts de afuera quedan rechazados.
+const recaptchaKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+
 let cached = null;
 
 export async function initFirebase() {
@@ -20,6 +24,12 @@ export async function initFirebase() {
     import('firebase/firestore'),
   ]);
   const app = initializeApp(config);
+  if (recaptchaKey) {
+    const { initializeAppCheck, ReCaptchaV3Provider } = await import('firebase/app-check');
+    // En desarrollo local Firebase entrega un token de depuracion que se registra en la consola
+    if (import.meta.env.DEV) self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+    initializeAppCheck(app, { provider: new ReCaptchaV3Provider(recaptchaKey), isTokenAutoRefreshEnabled: true });
+  }
   cached = { app, auth: getAuth(app), db: getFirestore(app) };
   return cached;
 }

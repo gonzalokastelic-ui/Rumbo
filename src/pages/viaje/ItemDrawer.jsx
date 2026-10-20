@@ -7,7 +7,27 @@ import { FechaUnica } from '../../components/Calendario.jsx';
 
 // Detalle de un item: panel lateral en escritorio y hoja inferior en celular.
 // Cada campo guarda al salir del input, asi la persona no tiene que "confirmar".
-export default function ItemDrawer({ item, editable, miembros, pasajeros = [], dias = [], onAgendar, onPatch, onDelete, onClose }) {
+// Solo links web. Si la persona escribe "consulado.gob.ar", se completa con https://
+const normalizarLink = (v) => {
+  const t = v.trim().slice(0, 1000);
+  if (!t) return '';
+  if (/^https?:\/\//i.test(t)) return t;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(t)) return '';
+  return `https://${t}`;
+};
+
+export default function ItemDrawer({
+  item,
+  editable,
+  miembros,
+  pasajeros = [],
+  dias = [],
+  onAgendar,
+  onPatch,
+  onDelete,
+  onClose,
+  children,
+}) {
   const cerrar = useRef(null);
   const tituloRef = useRef(null);
   const [eligiendoFecha, setEligiendoFecha] = useState(false);
@@ -221,7 +241,7 @@ export default function ItemDrawer({ item, editable, miembros, pasajeros = [], d
               placeholder="https://"
               defaultValue={item.link || ''}
               disabled={!editable}
-              onBlur={blur('link', item.link || '', (v) => v.trim())}
+              onBlur={blur('link', item.link || '', normalizarLink)}
             />
           </div>
 
@@ -256,6 +276,8 @@ export default function ItemDrawer({ item, editable, miembros, pasajeros = [], d
             </div>
           </div>
         )}
+
+        {children}
 
         <footer className="drawer__foot">
           {item.link && (

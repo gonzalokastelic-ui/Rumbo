@@ -16,11 +16,14 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { CaretRight, Clock, DotsSixVertical, MapPin, Plus, SortAscending, Trash, X } from '@phosphor-icons/react';
+import { CalendarPlus, CaretRight, Clock, DotsSixVertical, MapPin, Plus, SortAscending, Trash, X } from '@phosphor-icons/react';
 import { useSub } from '../../lib/useSub.js';
 import { diasDelViaje, formatoDia, hoyISO, parseISO, sumarDias } from '../../lib/fechas.js';
 import { mensajeError } from '../../lib/viajes.js';
 import { Cargando, useToast } from '../../components/ui.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { cita, crearRegistro } from '../../lib/actividad.js';
+import { descargarICS } from '../../lib/ics.js';
 
 const porOrden = (a, b) => (a.orden ?? 0) - (b.orden ?? 0);
 
@@ -396,6 +399,8 @@ function EventoDrawer({ evento, dias, editable, onPatch, onDelete, onClose }) {
 
 export default function Itinerario({ trip, editable, store }) {
   const toast = useToast();
+  const { user } = useAuth();
+  const registrar = useMemo(() => crearRegistro(store, trip, user), [store, trip, user]);
   const [abiertoId, setAbiertoId] = useState(null);
   const { data: eventos, cargando, error } = useSub(
     (ok, ko) => store.subscribeItinerario(trip.id, ok, ko),
@@ -431,9 +436,17 @@ export default function Itinerario({ trip, editable, store }) {
     }
   };
 
-  const agregar = seguro((fecha, titulo, hora) =>
-    store.addEvento(trip.id, { fecha, titulo, hora, lugar: '', notas: '', itemId: null, orden: Date.now() }),
-  );
+  const agregar = seguro(async (fecha, titulo, hora) => {
+    await store.addEvento(trip.id, { fecha, titulo, hora, lugar: '', notas: '', itemId: null, orden: Date.now() });
+    const dia = dias.find((d) => d.fecha === fecha);
+    registrar('agenda', `agregó ${cita(titulo)} al ${dia ? `día ${dia.n}` : 'itinerario'}`);
+  });
+
+  const exportar = () => {
+    const lista = (eventos || []).slice().sort((a, b) => (a.fecha + (a.hora || '')).localeCompare(b.fecha + (b.hora || '')));
+    descargarICS(trip, lista);
+    toast.ok('Descargamos el archivo .ics: abrilo para sumarlo a tu calendario.');
+  };
   const reordenar = seguro((lista) =>
     store.reorderEventos(
       trip.id,
@@ -452,11 +465,22 @@ export default function Itinerario({ trip, editable, store }) {
 
   return (
     <div className="itin">
-      <p className="muted itin__lead">
-        {editable
-          ? 'Tocá un día del calendario para ver y armar sus actividades.'
-          : 'Tocá un día del calendario para ver sus actividades.'}
-      </p>
+      <div className="itin__bar">
+        <p className="muted itin__lead">
+          {editable
+            ? 'Tocá un día del calendario para ver y armar sus actividades.'
+            : 'Tocá un día del calendario para ver sus actividades.'}
+        </p>
+        <button
+          type="button"
+          className="btn btn--glass btn--sm"
+          onClick={exportar}
+          disabled={!eventos?.length}
+          title="Descarga un archivo .ics para Google Calendar, Apple o Outlook"
+        >
+          <CalendarPlus size={16} /> Exportar al calendario
+        </button>
+      </div>
       {dias.length > 0 && (
         <CalendarioViaje dias={dias} porDia={porDia} seleccion={seleccion} onSeleccionar={setElegido} />
       )}
