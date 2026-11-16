@@ -87,3 +87,7 @@ export function mensajeError(e) {
   if (e?.code === 'unavailable') return 'Sin conexión con Firebase. Probá de nuevo en unos segundos.';
   return 'No pudimos guardar el cambio. Intentá de nuevo.';
 }
+
+// Codigo de un link de invitacion: largo e impredecible (40 caracteres hex)
+export const nuevoToken = () =>
+  crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 8);

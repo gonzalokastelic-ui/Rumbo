@@ -165,9 +165,8 @@ export function createMemoryStore() {
       perfiles.set(userId, { ...perfiles.get(userId), ...perfil });
     },
 
-    async createInvite(user, tripId, rol) {
-      const token = `demo${uid()}`.replace('-', '');
-      invites.set(token, { id: token, tripId, rol, ownerId: user.uid, activo: true });
+    async createInvite(user, tripId, rol, token = `demo${uid()}`.replace('-', '')) {
+      invites.set(token, { id: token, tripId, rol, ownerId: user.uid, activo: true, creado: Date.now() });
       emit();
       return token;
     },

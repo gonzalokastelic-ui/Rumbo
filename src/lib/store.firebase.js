@@ -20,6 +20,7 @@ import {
   arrayRemove,
   deleteField,
 } from 'firebase/firestore';
+import { nuevoToken } from './viajes.js';
 
 const conId = (snap) => ({ id: snap.id, ...snap.data() });
 
@@ -161,8 +162,8 @@ export function createFirebaseStore(db) {
     },
 
     // Invitaciones por link con rol
-    async createInvite(user, tripId, rol) {
-      const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+    // El token se puede generar antes (nuevoToken) para copiar el link en el mismo clic
+    async createInvite(user, tripId, rol, token = nuevoToken()) {
       await setDoc(doc(invites, token), {
         tripId,
         rol,

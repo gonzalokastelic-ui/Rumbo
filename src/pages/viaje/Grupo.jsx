@@ -2,21 +2,44 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Copy, Eye, LinkSimple, PencilSimple, SignOut, Trash } from '@phosphor-icons/react';
 import { useSub } from '../../lib/useSub.js';
-import { mensajeError, ROLES } from '../../lib/viajes.js';
+import { mensajeError, nuevoToken, ROLES } from '../../lib/viajes.js';
 import { Avatar, useToast } from '../../components/ui.jsx';
 import { GRUPOS_POR_ID } from '../../data/pasajeros.js';
 import { hace } from '../../lib/actividad.js';
 
 const linkDe = (token) => `${window.location.origin}/unirse/${token}`;
 
-async function copiar(texto, toast) {
+// Respaldo para navegadores que bloquean la API del portapapeles
+function copiarConSeleccion(texto) {
+  const area = document.createElement('textarea');
+  area.value = texto;
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed';
+  area.style.opacity = '0';
+  document.body.appendChild(area);
+  area.select();
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch {
+    ok = false;
+  }
+  area.remove();
+  return ok;
+}
+
+// Se llama dentro del clic, sin esperar nada antes: si pasa por un await,
+// Safari y algunos Chrome ya no lo toman como gesto y bloquean el portapapeles.
+async function copiar(texto) {
   try {
     await navigator.clipboard.writeText(texto);
-    toast.ok('Link copiado al portapapeles.');
+    return true;
   } catch {
-    toast.error('No pudimos copiar. Seleccioná el link y copialo a mano.');
+    return copiarConSeleccion(texto);
   }
 }
+
+const ms = (t) => (t?.toMillis ? t.toMillis() : typeof t === 'number' ? t : 0);
 
 export default function Grupo({ trip, user, store }) {
   const toast = useToast();
@@ -37,11 +60,28 @@ export default function Grupo({ trip, user, store }) {
   }));
   miembros.sort((a, b) => (a.rol === 'owner' ? -1 : b.rol === 'owner' ? 1 : a.nombre.localeCompare(b.nombre)));
 
-  const crearLink = async () => {
+  // Un link activo por rol: el mas nuevo de cada uno. Si quedaron varios de antes,
+  // cerrar el link los cierra a todos.
+  const porRol = (r) => (invites || []).filter((i) => i.rol === r).sort((a, b) => ms(b.creado) - ms(a.creado));
+  const activos = ['editor', 'viewer'].map((r) => ({ rol: r, lista: porRol(r) })).filter((g) => g.lista.length);
+  const actual = porRol(rol)[0];
+
+  const avisarCopia = (ok) =>
+    ok ? toast.ok('Link copiado. Pegalo donde quieras compartirlo.') : toast.error('No pudimos copiar. Copiá el link de la lista de abajo.');
+
+  const copiarLink = async () => {
+    // Ya hay un link con este rol: se copia ese, no se crea otro
+    if (actual) {
+      avisarCopia(await copiar(linkDe(actual.id)));
+      return;
+    }
+    // El codigo se genera aca para copiar el link en el mismo clic y guardarlo despues
+    const token = nuevoToken();
+    const copiado = copiar(linkDe(token));
     setCreando(true);
     try {
-      const token = await store.createInvite(user, trip.id, rol);
-      await copiar(linkDe(token), toast);
+      await store.createInvite(user, trip.id, rol, token);
+      avisarCopia(await copiado);
     } catch (e) {
       toast.error(mensajeError(e));
     } finally {
@@ -76,9 +116,9 @@ export default function Grupo({ trip, user, store }) {
     }
   };
 
-  const revocar = async (token) => {
+  const revocar = async (lista) => {
     try {
-      await store.revokeInvite(token);
+      await Promise.all(lista.map((i) => store.revokeInvite(i.id)));
       toast.ok('El link dejó de funcionar.');
     } catch (e) {
       toast.error(mensajeError(e));
@@ -223,30 +263,35 @@ export default function Grupo({ trip, user, store }) {
                 ? 'Quien entre con este link podrá tachar, agregar y modificar ítems.'
                 : 'Quien entre con este link podrá ver el viaje y su avance, sin cambiar nada.'}
             </p>
-            <button type="button" className="btn btn--primary" onClick={crearLink} disabled={creando}>
+            <button type="button" className="btn btn--primary" onClick={copiarLink} disabled={creando}>
               {creando ? <span className="spinner" /> : <LinkSimple size={18} />}
-              Crear y copiar link
+              {actual ? 'Copiar link' : 'Crear y copiar link'}
             </button>
           </div>
 
-          {invites && invites.length > 0 && (
+          {activos.length > 0 && (
             <>
               <h4 className="invite__h">Links activos</h4>
               <ul className="invites">
-                {invites.map((i) => (
-                  <li key={i.id}>
-                    <span className="chip">{i.rol === 'editor' ? 'Editor' : 'Solo lectura'}</span>
+                {activos.map(({ rol: r, lista }) => (
+                  <li key={r}>
+                    <span className="chip">{r === 'editor' ? 'Editor' : 'Solo lectura'}</span>
                     <input
                       className="input invites__link mono"
                       readOnly
-                      value={linkDe(i.id)}
-                      aria-label="Link de invitación"
+                      value={linkDe(lista[0].id)}
+                      aria-label={`Link de invitación, ${r === 'editor' ? 'editor' : 'solo lectura'}`}
                       onFocus={(e) => e.target.select()}
                     />
-                    <button type="button" className="icon-btn" onClick={() => copiar(linkDe(i.id), toast)} aria-label="Copiar link">
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      onClick={async () => avisarCopia(await copiar(linkDe(lista[0].id)))}
+                      aria-label="Copiar link"
+                    >
                       <Copy size={18} />
                     </button>
-                    <button type="button" className="btn btn--ghost btn--sm btn--danger" onClick={() => revocar(i.id)}>
+                    <button type="button" className="btn btn--ghost btn--sm btn--danger" onClick={() => revocar(lista)}>
                       Cerrar link
                     </button>
                   </li>
